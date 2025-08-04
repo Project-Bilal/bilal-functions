@@ -1,41 +1,72 @@
-from appwrite.client import Client
-from appwrite.services.users import Users
-from appwrite.exception import AppwriteException
-import os
+import paho.mqtt.client as mqtt
+import json
+
+
+def send_mqtt_message(topic, message, broker="broker.hivemq.com", port=1883):
+    """
+    Send a message to the MQTT broker
+    """
+    try:
+        # Create MQTT client
+        client = mqtt.Client()
+
+        # Connect to broker
+        client.connect(broker, port, 60)
+
+        # Publish message
+        result = client.publish(topic, message)
+
+        # Wait for the message to be sent
+        client.loop()
+
+        # Disconnect
+        client.disconnect()
+
+        return True, "Message sent successfully"
+    except Exception as e:
+        return False, f"Failed to send message: {str(e)}"
 
 
 # This Appwrite function will be executed every time your function is triggered
 def main(context):
-    # You can use the Appwrite SDK to interact with other services
-    # For this example, we're using the Users service
-    client = (
-        Client()
-        .set_endpoint(os.environ["APPWRITE_FUNCTION_API_ENDPOINT"])
-        .set_project(os.environ["APPWRITE_FUNCTION_PROJECT_ID"])
-        .set_key(context.req.headers["x-appwrite-key"])
-    )
-    users = Users(client)
+    # Get request data
+    request_data = context.req.body
 
-    try:
-        response = users.list()
-        # Log messages and errors to the Appwrite Console
-        # These logs won't be seen by your end users
-        context.log("Total users: " + str(response["total"]))
-    except AppwriteException as err:
-        context.error("Could not list users: " + repr(err))
+    # Default topic and message
+    topic = "bilal/notifications"
+    message = "Hello from Bilal Functions!"
 
-    # The req object contains the request data
-    if context.req.path == "/ping":
-        # Use res object to respond with text(), json(), or binary()
-        # Don't forget to return a response!
-        return context.res.text("Pong")
+    # If request body is provided, try to parse it
+    if request_data:
+        try:
+            data = json.loads(request_data)
+            topic = data.get("topic", topic)
+            message = data.get("message", message)
+        except json.JSONDecodeError:
+            context.log("Invalid JSON in request body, using defaults")
 
-    return context.res.json(
-        {
-            "motto": "Rafik is soo cooool",
-            "learn": "https://appwrite.io/docs",
-            "connect": "https://appwrite.io/discord",
-            "getInspired": "https://builtwith.appwrite.io",
-            "hello": "world",
-        }
-    )
+    # Send message to MQTT broker
+    success, result_message = send_mqtt_message(topic, message)
+
+    if success:
+        context.log(f"MQTT message sent to {topic}: {message}")
+        return context.res.json(
+            {
+                "success": True,
+                "message": result_message,
+                "topic": topic,
+                "sent_message": message,
+                "broker": "broker.hivemq.com",
+            }
+        )
+    else:
+        context.error(f"Failed to send MQTT message: {result_message}")
+        return context.res.json(
+            {
+                "success": False,
+                "error": result_message,
+                "topic": topic,
+                "broker": "broker.hivemq.com",
+            },
+            500,
+        )
