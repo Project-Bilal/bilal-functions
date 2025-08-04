@@ -1,0 +1,38 @@
+{
+  "projectId": "projectbilal",
+  "endpoint": "https://fra.cloud.appwrite.io/v1",
+  "functions": [
+    {
+      "$id": "invoke-notification",
+      "execute": ["any"],
+      "name": "invoke-notification",
+      "enabled": true,
+      "logging": true,
+      "runtime": "python-3.12",
+      "scopes": [],
+      "events": [],
+      "schedule": "",
+      "timeout": 15,
+      "entrypoint": "src/main.py",
+      "commands": "pip install -r requirements.txt",
+      "specification": "s-0.5vcpu-512mb",
+      "path": "invoke-notification"
+    },
+    {
+      "$id": "notification-checker",
+      "execute": ["any"],
+      "name": "notification-checker",
+      "enabled": true,
+      "logging": true,
+      "runtime": "python-3.12",
+      "scopes": [],
+      "events": [],
+      "schedule": "",
+      "timeout": 15,
+      "entrypoint": "src/main.py",
+      "commands": "pip install -r requirements.txt",
+      "specification": "s-0.5vcpu-512mb",
+      "path": "notification-checker"
+    }
+  ]
+}
