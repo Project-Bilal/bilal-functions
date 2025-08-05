@@ -130,6 +130,15 @@ def main(context):
 
         context.log(f"All notifications: {all_notifications}")
 
+        try:
+            databases.upsert_documents(
+                database_id="projectbilal",
+                collection_id="notifications",
+                documents=all_notifications,
+            )
+        except Exception as e:
+            context.error(f"Failed to create notification document: {str(e)}")
+
         return context.res.json(
             {
                 "success": True,

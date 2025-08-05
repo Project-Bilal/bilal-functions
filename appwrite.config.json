@@ -46,7 +46,8 @@
             "logging": true,
             "runtime": "python-3.12",
             "scopes": [
-                "documents.read"
+                "documents.read",
+                "documents.write"
             ],
             "events": [],
             "schedule": "",
