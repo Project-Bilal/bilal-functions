@@ -7,19 +7,28 @@ def send_mqtt_message(topic, message, broker="broker.hivemq.com", port=1883):
     Send a message to the MQTT broker
     """
     try:
-        # Create MQTT client
-        client = mqtt.Client()
+        # Create MQTT client with a unique client ID
+        client = mqtt.Client(client_id=f"bilal_function_{hash(topic)}")
 
-        # Connect to broker
+        # Set connection timeout
         client.connect(broker, port, 60)
 
-        # Publish message
-        client.publish(topic, message)
+        # Start the loop to handle the connection
+        client.loop_start()
+
+        # Wait a moment for connection to establish
+        import time
+
+        time.sleep(1)
+
+        # Publish message with QoS 1 for reliability
+        result = client.publish(topic, message, qos=1)
 
         # Wait for the message to be sent
-        client.loop()
+        result.wait_for_publish()
 
-        # Disconnect
+        # Stop the loop and disconnect
+        client.loop_stop()
         client.disconnect()
 
         return True, "Message sent successfully"
@@ -58,6 +67,8 @@ def main(context):
             topic = f"projectbilal/{device_id}"
 
             context.log(f"Processing play action for device {device_id}")
+            context.log(f"Topic: {topic}")
+            context.log(f"Message: {message}")
 
             # Send message to MQTT broker
             success, result_message = send_mqtt_message(topic, message)

@@ -4,6 +4,7 @@ from appwrite.services.databases import Databases
 from appwrite.query import Query
 from appwrite.services.functions import Functions
 import os
+import json
 
 
 # This Appwrite function will be executed every time your function is triggered
@@ -30,19 +31,28 @@ def main(context):
         if notifications["total"] > 0:
             functions = Functions(client)
             for notification in notifications["documents"]:
+                # Prepare notification data
+                notification_data = {
+                    "device_id": notification["device_id"],
+                    "timestampUTC": notification["timestampUTC"],
+                    "ip_address": notification["ip_address"],
+                    "port": notification["port"],
+                    "audio_id": notification["audio_id"],
+                    "volume": notification["volume"],
+                }
+
                 # Send notification to device
-                functions.create_execution(
-                    function_id="invoke-notification",
-                    body={
-                        "device_id": notification["device_id"],
-                        "timestampUTC": notification["timestampUTC"],
-                        "ip_address": notification["ip_address"],
-                        "port": notification["port"],
-                        "audio_id": notification["audio_id"],
-                        "volume": notification["volume"],
-                    },
-                )
-                context.log(f"Sent notification to device: {notification["$id"]}")
+                try:
+                    functions.create_execution(
+                        function_id="invoke-notification",
+                        body=json.dumps(notification_data),
+                    )
+                    context.log(f"Sent notification to device: {notification['$id']}")
+                except Exception as e:
+                    context.error(
+                        f"Failed to send notification {notification['$id']}: {str(e)}"
+                    )
+
             return context.res.json(
                 {"success": True, "total_notifications": notifications["total"]}
             )
