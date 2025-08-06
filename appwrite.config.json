@@ -14,7 +14,7 @@
             "scopes": [],
             "events": [],
             "schedule": "",
-            "timeout": 15,
+            "timeout": 100,
             "entrypoint": "src/main.py",
             "commands": "pip install -r requirements.txt",
             "specification": "s-0.5vcpu-512mb",
@@ -33,8 +33,8 @@
                 "documents.read"
             ],
             "events": [],
-            "schedule": "",
-            "timeout": 15,
+            "schedule": "* * * * *",
+            "timeout": 100,
             "entrypoint": "src/main.py",
             "commands": "pip install -r requirements.txt",
             "specification": "s-0.5vcpu-512mb",
@@ -49,11 +49,12 @@
             "runtime": "python-3.12",
             "scopes": [
                 "documents.read",
-                "documents.write"
+                "documents.write",
+                "execution.write"
             ],
             "events": [],
-            "schedule": "",
-            "timeout": 15,
+            "schedule": "0 9 * * *",
+            "timeout": 100,
             "entrypoint": "src/main.py",
             "commands": "pip install -r requirements.txt",
             "specification": "s-0.5vcpu-512mb",
