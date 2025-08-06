@@ -29,7 +29,9 @@
             "enabled": true,
             "logging": true,
             "runtime": "python-3.12",
-            "scopes": [],
+            "scopes": [
+                "documents.read"
+            ],
             "events": [],
             "schedule": "",
             "timeout": 15,
