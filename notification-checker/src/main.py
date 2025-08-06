@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 from appwrite.client import Client
 from appwrite.services.databases import Databases
 from appwrite.query import Query
+from appwrite.services.functions import Functions
 import os
 
 
@@ -14,6 +15,7 @@ def main(context):
         Client()
         .set_project(os.environ["APPWRITE_FUNCTION_PROJECT_ID"])
         .set_key(context.req.headers["x-appwrite-key"])
+        .set_endpoint("https://fra.cloud.appwrite.io/v1")  # Your API Endpoint
     )
 
     databases = Databases(client)
@@ -25,6 +27,25 @@ def main(context):
             collection_id="notifications",
             queries=[Query.equal("timestampUTC", current_time)],
         )
+        if notifications["total"] > 0:
+            functions = Functions(client)
+            for notification in notifications["documents"]:
+                # Send notification to device
+                functions.create_execution(
+                    function_id="invoke-notification",
+                    body={
+                        "device_id": notification["device_id"],
+                        "timestampUTC": notification["timestampUTC"],
+                        "ip_address": notification["ip_address"],
+                        "port": notification["port"],
+                        "audio_id": notification["audio_id"],
+                        "volume": notification["volume"],
+                    },
+                )
+                context.log(f"Sent notification to device: {notification["$id"]}")
+            return context.res.json(
+                {"success": True, "total_notifications": notifications["total"]}
+            )
 
         return context.res.json(
             {
