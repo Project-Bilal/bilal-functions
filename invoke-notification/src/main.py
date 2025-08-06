@@ -22,7 +22,7 @@ def send_mqtt_message(topic, message, broker="broker.hivemq.com", port=1883):
         time.sleep(1)
 
         # Publish message with QoS 1 for reliability
-        result = client.publish(topic, message, qos=1)
+        result = client.publish(topic, message, qos=0)
 
         # Wait for the message to be sent
         result.wait_for_publish()
