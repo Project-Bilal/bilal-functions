@@ -94,15 +94,52 @@ def main(context):
             context.log(f"Topic: {topic}")
             context.log(f"Message: {message}")
 
-            # Resolve configuration from function variables first, then env
+            # Resolve configuration from multiple possible sources, then env
             def get_var(name: str, default: str | None = None):
+                potential_sources = []
                 try:
-                    vars_from_req = getattr(context.req, "variables", {}) or {}
-                    if isinstance(vars_from_req, dict) and name in vars_from_req:
-                        return vars_from_req.get(name, default)
+                    potential_sources.append(getattr(context, "variables", {}) or {})
                 except Exception:
                     pass
+                try:
+                    potential_sources.append(getattr(context, "env", {}) or {})
+                except Exception:
+                    pass
+                try:
+                    potential_sources.append(getattr(context, "vars", {}) or {})
+                except Exception:
+                    pass
+                try:
+                    potential_sources.append(getattr(context.req, "variables", {}) or {})
+                except Exception:
+                    pass
+                try:
+                    potential_sources.append(getattr(context.req, "env", {}) or {})
+                except Exception:
+                    pass
+
+                for source in potential_sources:
+                    if isinstance(source, dict) and name in source:
+                        return source.get(name, default)
+
                 return os.environ.get(name, default)
+
+            # For troubleshooting: log which MQTT_* keys are visible (not their values)
+            try:
+                visible_keys = set()
+                for source in [
+                    getattr(context, "variables", {}) or {},
+                    getattr(context, "env", {}) or {},
+                    getattr(context, "vars", {}) or {},
+                    getattr(context.req, "variables", {}) or {},
+                    getattr(context.req, "env", {}) or {},
+                ]:
+                    if isinstance(source, dict):
+                        visible_keys.update(k for k in source.keys() if k.startswith("MQTT_"))
+                visible_keys.update(k for k in os.environ.keys() if k.startswith("MQTT_"))
+                context.log(f"Visible MQTT_* keys: {sorted(list(visible_keys))}")
+            except Exception:
+                pass
 
             broker = get_var("MQTT_BROKER")
             port_str = get_var("MQTT_PORT", "8883")
