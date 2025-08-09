@@ -1,17 +1,8 @@
 import paho.mqtt.client as mqtt
 import json
-import os
-import ssl
 
 
-def send_mqtt_message(
-    topic: str,
-    message: str,
-    broker: str,
-    port: int,
-    username: str | None = None,
-    password: str | None = None,
-):
+def send_mqtt_message(topic, message, broker="broker.hivemq.com", port=1883):
     """
     Send a message to the MQTT broker
     """
@@ -19,23 +10,8 @@ def send_mqtt_message(
         # Create MQTT client with a unique client ID
         client = mqtt.Client(client_id=f"bilal_function_{hash(topic)}")
 
-        # Configure username/password if provided
-        if username:
-            client.username_pw_set(username, password)
-
-        # Enable TLS/SSL with more compatible settings for HiveMQ Cloud
-        client.tls_set(
-            ca_certs=None,
-            certfile=None,
-            keyfile=None,
-            cert_reqs=ssl.CERT_NONE,  # Less strict for HiveMQ Cloud
-            tls_version=ssl.PROTOCOL_TLS,
-            ciphers=None,
-        )
-        client.tls_insecure_set(True)  # Allow insecure for testing
-
-        # Set connection timeout and connect over TLS
-        client.connect(broker, port, keepalive=60, bind_address="")
+        # Set connection timeout
+        client.connect(broker, port, 60)
 
         # Start the loop to handle the connection
         client.loop_start()
@@ -46,7 +22,7 @@ def send_mqtt_message(
         time.sleep(1)
 
         # Publish message with QoS 1 for reliability
-        result = client.publish(topic, message, qos=1)
+        result = client.publish(topic, message, qos=0)
 
         # Wait for the message to be sent
         result.wait_for_publish()
@@ -94,36 +70,8 @@ def main(context):
             context.log(f"Topic: {topic}")
             context.log(f"Message: {message}")
 
-            # Get MQTT configuration from environment variables
-            broker = os.environ.get("MQTT_BROKER")
-            port_str = os.environ.get("MQTT_PORT", "8883")
-            username = os.environ.get("MQTT_USER")
-            password = os.environ.get("MQTT_PASS")
-
-            if not broker:
-                return context.res.json(
-                    {"success": False, "error": "MQTT_BROKER is not configured"}, 500
-                )
-
-            try:
-                mqtt_port = int(port_str)
-            except ValueError:
-                return context.res.json(
-                    {
-                        "success": False,
-                        "error": f"Invalid MQTT_PORT value: {port_str}",
-                    },
-                    500,
-                )
-
-            context.log(
-                f"MQTT config -> broker: {broker}, port: {mqtt_port}, user set: {bool(username)}"
-            )
-
             # Send message to MQTT broker
-            success, result_message = send_mqtt_message(
-                topic, message, broker, mqtt_port, username, password
-            )
+            success, result_message = send_mqtt_message(topic, message)
 
             if success:
                 context.log(f"MQTT message sent to {topic}: {message}")
@@ -133,7 +81,7 @@ def main(context):
                         "message": result_message,
                         "topic": topic,
                         "sent_message": message,
-                        "broker": broker,
+                        "broker": "broker.hivemq.com",
                     }
                 )
             else:
@@ -143,7 +91,7 @@ def main(context):
                         "success": False,
                         "error": result_message,
                         "topic": topic,
-                        "broker": broker,
+                        "broker": "broker.hivemq.com",
                     },
                     500,
                 )
