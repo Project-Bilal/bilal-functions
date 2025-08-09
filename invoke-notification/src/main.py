@@ -94,33 +94,16 @@ def main(context):
             context.log(f"Topic: {topic}")
             context.log(f"Message: {message}")
 
-            # Strict env access per docs; fail fast if missing broker
-            try:
-                broker = os.environ["MQTT_BROKER"]
-            except KeyError:
-                return context.res.json(
-                    {"success": False, "error": "MQTT_BROKER is not configured"}, 500
-                )
+            # Get MQTT configuration from environment variables
+            broker = os.environ.get("MQTT_BROKER")
             port_str = os.environ.get("MQTT_PORT", "8883")
             username = os.environ.get("MQTT_USER")
             password = os.environ.get("MQTT_PASS")
 
-            # Optional temporary debug: echo env presence without secrets
-            if isinstance(data, dict) and data.get("debug_env") is True:
-                mqtt_keys = sorted([k for k in os.environ.keys() if k.startswith("MQTT_")])
+            if not broker:
                 return context.res.json(
-                    {
-                        "success": True,
-                        "debug": True,
-                        "mqtt_keys": mqtt_keys,
-                        "broker": broker,
-                        "has_user": bool(username),
-                        "has_pass": bool(password),
-                        "port": port_str,
-                    }
+                    {"success": False, "error": "MQTT_BROKER is not configured"}, 500
                 )
-
-            # broker already validated above
 
             try:
                 mqtt_port = int(port_str)
