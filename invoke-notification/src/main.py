@@ -4,31 +4,24 @@ import os
 import ssl
 
 
-def send_mqtt_message(topic, message):
+def send_mqtt_message(
+    topic: str,
+    message: str,
+    broker: str,
+    port: int,
+    username: str | None = None,
+    password: str | None = None,
+):
     """
     Send a message to the MQTT broker
     """
     try:
-        # Read MQTT configuration from environment variables
-        broker = os.environ.get("MQTT_BROKER")
-        port_str = os.environ.get("MQTT_PORT", "8883")
-        mqtt_username = os.environ.get("MQTT_USER")
-        mqtt_password = os.environ.get("MQTT_PASS")
-
-        if not broker:
-            return False, "MQTT_BROKER environment variable is not set"
-
-        try:
-            port = int(port_str)
-        except ValueError:
-            return False, f"Invalid MQTT_PORT value: {port_str}"
-
         # Create MQTT client with a unique client ID
         client = mqtt.Client(client_id=f"bilal_function_{hash(topic)}")
 
         # Configure username/password if provided
-        if mqtt_username:
-            client.username_pw_set(mqtt_username, mqtt_password)
+        if username:
+            client.username_pw_set(username, password)
 
         # Enable TLS/SSL. Rely on system CA certificates
         client.tls_set(
@@ -101,8 +94,49 @@ def main(context):
             context.log(f"Topic: {topic}")
             context.log(f"Message: {message}")
 
+            # Resolve configuration from function variables first, then env
+            def get_var(name: str, default: str | None = None):
+                try:
+                    vars_from_req = getattr(context.req, "variables", {}) or {}
+                    if isinstance(vars_from_req, dict) and name in vars_from_req:
+                        return vars_from_req.get(name, default)
+                except Exception:
+                    pass
+                return os.environ.get(name, default)
+
+            broker = get_var("MQTT_BROKER")
+            port_str = get_var("MQTT_PORT", "8883")
+            username = get_var("MQTT_USER")
+            password = get_var("MQTT_PASS")
+
+            if not broker:
+                return context.res.json(
+                    {
+                        "success": False,
+                        "error": "MQTT_BROKER is not configured",
+                    },
+                    500,
+                )
+
+            try:
+                mqtt_port = int(port_str)
+            except ValueError:
+                return context.res.json(
+                    {
+                        "success": False,
+                        "error": f"Invalid MQTT_PORT value: {port_str}",
+                    },
+                    500,
+                )
+
+            context.log(
+                f"MQTT config -> broker: {broker}, port: {mqtt_port}, user set: {bool(username)}"
+            )
+
             # Send message to MQTT broker
-            success, result_message = send_mqtt_message(topic, message)
+            success, result_message = send_mqtt_message(
+                topic, message, broker, mqtt_port, username, password
+            )
 
             if success:
                 context.log(f"MQTT message sent to {topic}: {message}")
@@ -112,7 +146,7 @@ def main(context):
                         "message": result_message,
                         "topic": topic,
                         "sent_message": message,
-                        "broker": os.environ.get("MQTT_BROKER"),
+                        "broker": broker,
                     }
                 )
             else:
@@ -122,7 +156,7 @@ def main(context):
                         "success": False,
                         "error": result_message,
                         "topic": topic,
-                        "broker": os.environ.get("MQTT_BROKER"),
+                        "broker": broker,
                     },
                     500,
                 )
