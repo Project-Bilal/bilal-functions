@@ -1,17 +1,48 @@
 import paho.mqtt.client as mqtt
 import json
+import os
+import ssl
 
 
-def send_mqtt_message(topic, message, broker="broker.hivemq.com", port=1883):
+def send_mqtt_message(topic, message):
     """
     Send a message to the MQTT broker
     """
     try:
+        # Read MQTT configuration from environment variables
+        broker = os.environ.get("MQTT_BROKER")
+        port_str = os.environ.get("MQTT_PORT", "8883")
+        mqtt_username = os.environ.get("MQTT_USER")
+        mqtt_password = os.environ.get("MQTT_PASS")
+
+        if not broker:
+            return False, "MQTT_BROKER environment variable is not set"
+
+        try:
+            port = int(port_str)
+        except ValueError:
+            return False, f"Invalid MQTT_PORT value: {port_str}"
+
         # Create MQTT client with a unique client ID
         client = mqtt.Client(client_id=f"bilal_function_{hash(topic)}")
 
-        # Set connection timeout
-        client.connect(broker, port, 60)
+        # Configure username/password if provided
+        if mqtt_username:
+            client.username_pw_set(mqtt_username, mqtt_password)
+
+        # Enable TLS/SSL. Rely on system CA certificates
+        client.tls_set(
+            ca_certs=None,
+            certfile=None,
+            keyfile=None,
+            cert_reqs=ssl.CERT_REQUIRED,
+            tls_version=ssl.PROTOCOL_TLS,
+            ciphers=None,
+        )
+        client.tls_insecure_set(False)
+
+        # Set connection timeout and connect over TLS
+        client.connect(broker, port, keepalive=60)
 
         # Start the loop to handle the connection
         client.loop_start()
@@ -81,7 +112,7 @@ def main(context):
                         "message": result_message,
                         "topic": topic,
                         "sent_message": message,
-                        "broker": "broker.hivemq.com",
+                        "broker": os.environ.get("MQTT_BROKER"),
                     }
                 )
             else:
@@ -91,7 +122,7 @@ def main(context):
                         "success": False,
                         "error": result_message,
                         "topic": topic,
-                        "broker": "broker.hivemq.com",
+                        "broker": os.environ.get("MQTT_BROKER"),
                     },
                     500,
                 )
