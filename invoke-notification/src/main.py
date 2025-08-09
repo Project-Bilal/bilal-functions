@@ -94,66 +94,33 @@ def main(context):
             context.log(f"Topic: {topic}")
             context.log(f"Message: {message}")
 
-            # Resolve configuration from multiple possible sources, then env
-            def get_var(name: str, default: str | None = None):
-                potential_sources = []
-                try:
-                    potential_sources.append(getattr(context, "variables", {}) or {})
-                except Exception:
-                    pass
-                try:
-                    potential_sources.append(getattr(context, "env", {}) or {})
-                except Exception:
-                    pass
-                try:
-                    potential_sources.append(getattr(context, "vars", {}) or {})
-                except Exception:
-                    pass
-                try:
-                    potential_sources.append(getattr(context.req, "variables", {}) or {})
-                except Exception:
-                    pass
-                try:
-                    potential_sources.append(getattr(context.req, "env", {}) or {})
-                except Exception:
-                    pass
-
-                for source in potential_sources:
-                    if isinstance(source, dict) and name in source:
-                        return source.get(name, default)
-
-                return os.environ.get(name, default)
-
-            # For troubleshooting: log which MQTT_* keys are visible (not their values)
+            # Strict env access per docs; fail fast if missing broker
             try:
-                visible_keys = set()
-                for source in [
-                    getattr(context, "variables", {}) or {},
-                    getattr(context, "env", {}) or {},
-                    getattr(context, "vars", {}) or {},
-                    getattr(context.req, "variables", {}) or {},
-                    getattr(context.req, "env", {}) or {},
-                ]:
-                    if isinstance(source, dict):
-                        visible_keys.update(k for k in source.keys() if k.startswith("MQTT_"))
-                visible_keys.update(k for k in os.environ.keys() if k.startswith("MQTT_"))
-                context.log(f"Visible MQTT_* keys: {sorted(list(visible_keys))}")
-            except Exception:
-                pass
+                broker = os.environ["MQTT_BROKER"]
+            except KeyError:
+                return context.res.json(
+                    {"success": False, "error": "MQTT_BROKER is not configured"}, 500
+                )
+            port_str = os.environ.get("MQTT_PORT", "8883")
+            username = os.environ.get("MQTT_USER")
+            password = os.environ.get("MQTT_PASS")
 
-            broker = get_var("MQTT_BROKER")
-            port_str = get_var("MQTT_PORT", "8883")
-            username = get_var("MQTT_USER")
-            password = get_var("MQTT_PASS")
-
-            if not broker:
+            # Optional temporary debug: echo env presence without secrets
+            if isinstance(data, dict) and data.get("debug_env") is True:
+                mqtt_keys = sorted([k for k in os.environ.keys() if k.startswith("MQTT_")])
                 return context.res.json(
                     {
-                        "success": False,
-                        "error": "MQTT_BROKER is not configured",
-                    },
-                    500,
+                        "success": True,
+                        "debug": True,
+                        "mqtt_keys": mqtt_keys,
+                        "broker": broker,
+                        "has_user": bool(username),
+                        "has_pass": bool(password),
+                        "port": port_str,
+                    }
                 )
+
+            # broker already validated above
 
             try:
                 mqtt_port = int(port_str)
