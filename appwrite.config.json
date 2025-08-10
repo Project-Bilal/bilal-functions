@@ -17,7 +17,7 @@
             "timeout": 100,
             "entrypoint": "src/main.py",
             "commands": "pip install -r requirements.txt",
-            "specification": "s-0.5vcpu-512mb",
+            "specification": "s-1vcpu-512mb",
             "path": "invoke-notification"
         },
         {
