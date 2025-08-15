@@ -58,14 +58,14 @@ def send_mqtt_message(topic, message, broker="broker.hivemq.com", port=1883):
 def main(context):
     try:
         data = context.req.body_json
-        
+
         # Log the incoming request for debugging
         context.log(f"Received request with data: {json.dumps(data)}")
-        
+
         # Check if this is a BLE action
         if "ble" in data:
             ble_address = data["ble"]
-            
+
             # Validate BLE address format (basic validation)
             if not ble_address or not isinstance(ble_address, str):
                 return context.res.json(
@@ -73,31 +73,30 @@ def main(context):
                         "success": False,
                         "error": "Invalid BLE address format. Must be a non-empty string.",
                         "received_value": ble_address,
-                        "expected_format": "1c-69-20-ea-c6-8c"
+                        "expected_format": "1c-69-20-ea-c6-8c",
                     },
                     400,
                 )
-            
+
             # Create the BLE message
-            message_obj = {
-                "action": "ble",
-                "props": {}
-            }
-            
+            message_obj = {"action": "ble", "props": {}}
+
             # Convert to JSON string
             message = json.dumps(message_obj)
             topic = f"projectbilal/{ble_address}"
-            
+
             context.log(f"Processing BLE action for device {ble_address}")
             context.log(f"Topic: {topic}")
             context.log(f"Message: {message}")
-            
+
             # Send message to MQTT broker
             success, result_message = send_mqtt_message(topic, message)
-            
+
             if success:
                 context.log(f"MQTT message sent to {topic}: {message}")
-                context.log(f"BLE action completed successfully for device {ble_address}")
+                context.log(
+                    f"BLE action completed successfully for device {ble_address}"
+                )
                 return context.res.json(
                     {
                         "success": True,
@@ -105,7 +104,7 @@ def main(context):
                         "topic": topic,
                         "sent_message": message,
                         "broker": "broker.hivemq.com",
-                        "action_type": "ble"
+                        "action_type": "ble",
                     }
                 )
             else:
@@ -116,11 +115,11 @@ def main(context):
                         "error": result_message,
                         "topic": topic,
                         "broker": "broker.hivemq.com",
-                        "action_type": "ble"
+                        "action_type": "ble",
                     },
                     500,
                 )
-        
+
         # Check if all required fields are present for play action
         required_fields = ["volume", "audio_id", "ip_address", "port", "device_id"]
         if all(field in data for field in required_fields):
@@ -155,7 +154,9 @@ def main(context):
 
             if success:
                 context.log(f"MQTT message sent to {topic}: {message}")
-                context.log(f"Play action completed successfully for device {device_id}")
+                context.log(
+                    f"Play action completed successfully for device {device_id}"
+                )
                 return context.res.json(
                     {
                         "success": True,
@@ -163,7 +164,7 @@ def main(context):
                         "topic": topic,
                         "sent_message": message,
                         "broker": "broker.hivemq.com",
-                        "action_type": "play"
+                        "action_type": "play",
                     }
                 )
             else:
@@ -174,7 +175,7 @@ def main(context):
                         "error": result_message,
                         "topic": topic,
                         "broker": "broker.hivemq.com",
-                        "action_type": "play"
+                        "action_type": "play",
                     },
                     500,
                 )
@@ -185,9 +186,9 @@ def main(context):
                     "success": False,
                     "error": "Invalid request format. Must include either 'ble' field or all required play action fields",
                     "supported_actions": {
-                        "ble": "Send BLE action with format: {\"ble\": \"device_address\"}",
-                        "play": "Send play action with format: {\"volume\": \"...\", \"audio_id\": \"...\", \"ip_address\": \"...\", \"port\": \"...\", \"device_id\": \"...\"}"
-                    }
+                        "ble": 'Send BLE action with format: {"ble": "device_address"}',
+                        "play": 'Send play action with format: {"volume": "...", "audio_id": "...", "ip_address": "...", "port": "...", "device_id": "..."}',
+                    },
                 },
                 400,
             )
