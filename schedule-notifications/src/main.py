@@ -110,6 +110,15 @@ def build_notifications_for_device(device, date_str, context):
     """Build notification payloads for a single device."""
     notifications = []
 
+    # Check for required fields before making API call
+    required_fields = ["latitude", "longitude", "method", "ip_address", "port"]
+    for field in required_fields:
+        if not device.get(field):
+            context.log(
+                f"Device {device.get('device_id', 'unknown')} missing {field}, skipping"
+            )
+            return notifications
+
     try:
         timings = fetch_prayer_time(
             date_str, device["latitude"], device["longitude"], device["method"], context
