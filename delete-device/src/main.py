@@ -1,6 +1,7 @@
 from appwrite.client import Client
 from appwrite.services.databases import Databases
 from appwrite.exception import AppwriteException
+from appwrite.query import Query
 import json
 import os
 
@@ -45,7 +46,7 @@ def main(context):
             timings_response = databases.list_documents(
                 database_id=database_id,
                 collection_id="timings",
-                queries=[f'device_id="{device_id}"'],
+                queries=[Query.equal("device_id", device_id)],
             )
 
             for document in timings_response["documents"]:
@@ -56,14 +57,14 @@ def main(context):
                 )
         except AppwriteException as e:
             # Log error but continue with other operations
-            print(f"Error deleting from timings collection: {e}")
+            context.log(f"Error deleting from timings collection: {e}")
 
         # Delete documents from notifications collection where device_id matches
         try:
             notifications_response = databases.list_documents(
                 database_id=database_id,
                 collection_id="notifications",
-                queries=[f'device_id="{device_id}"'],
+                queries=[Query.equal("device_id", device_id)],
             )
 
             for document in notifications_response["documents"]:
@@ -74,7 +75,7 @@ def main(context):
                 )
         except AppwriteException as e:
             # Log error but continue with other operations
-            print(f"Error deleting from notifications collection: {e}")
+            context.log(f"Error deleting from notifications collection: {e}")
 
         # Update the device document (don't delete, just update fields)
         try:
@@ -82,7 +83,7 @@ def main(context):
             device_response = databases.list_documents(
                 database_id=database_id,
                 collection_id="devices",
-                queries=[f'device_id="{device_id}"'],
+                queries=[Query.equal("device_id", device_id)],
             )
 
             if device_response["documents"]:
