@@ -33,14 +33,12 @@ def main(context):
 
         # Initialize Appwrite client
         client = Client()
-        client.set_endpoint(
-            os.environ.get("APPWRITE_ENDPOINT", "https://cloud.appwrite.io/v1")
-        )
-        client.set_project(os.environ.get("APPWRITE_PROJECT_ID"))
-        client.set_key(os.environ.get("APPWRITE_API_KEY"))
+        client.set_endpoint("https://fra.cloud.appwrite.io/v1")
+        client.set_project(os.environ["APPWRITE_FUNCTION_PROJECT_ID"])
+        client.set_key(context.req.headers["x-appwrite-key"])
 
         databases = Databases(client)
-        database_id = os.environ.get("APPWRITE_DATABASE_ID", "projectbilal")
+        database_id = "projectbilal"
 
         # Delete documents from timings collection where device_id matches
         try:
