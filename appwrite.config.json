@@ -70,14 +70,16 @@
             "enabled": true,
             "logging": true,
             "runtime": "python-3.12",
-            "scopes": [],
+            "scopes": [
+                "documents.write"
+            ],
             "events": [],
             "schedule": "",
             "timeout": 15,
             "entrypoint": "src/main.py",
             "commands": "pip install -r requirements.txt",
             "specification": "s-0.5vcpu-512mb",
-            "path": "functions/delete-device"
+            "path": "delete-device"
         }
     ]
 }

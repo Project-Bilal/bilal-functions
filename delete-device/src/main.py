@@ -40,7 +40,7 @@ def main(context):
         client.set_key(os.environ.get("APPWRITE_API_KEY"))
 
         databases = Databases(client)
-        database_id = os.environ.get("APPWRITE_DATABASE_ID")
+        database_id = os.environ.get("APPWRITE_DATABASE_ID", "projectbilal")
 
         # Delete documents from timings collection where device_id matches
         try:
