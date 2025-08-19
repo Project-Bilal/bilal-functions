@@ -1,85 +1,70 @@
 {
-    "projectId": "projectbilal",
-    "endpoint": "https://fra.cloud.appwrite.io/v1",
-    "functions": [
-        {
-            "$id": "invoke-notification",
-            "execute": [
-                "any"
-            ],
-            "name": "invoke-notification",
-            "enabled": true,
-            "logging": true,
-            "runtime": "python-3.12",
-            "scopes": [],
-            "events": [],
-            "schedule": "",
-            "timeout": 100,
-            "entrypoint": "src/main.py",
-            "commands": "pip install -r requirements.txt",
-            "specification": "s-1vcpu-512mb",
-            "path": "invoke-notification"
-        },
-        {
-            "$id": "notification-checker",
-            "execute": [
-                "any"
-            ],
-            "name": "notification-checker",
-            "enabled": true,
-            "logging": true,
-            "runtime": "python-3.12",
-            "scopes": [
-                "documents.read",
-                "execution.write"
-            ],
-            "events": [],
-            "schedule": "* * * * *",
-            "timeout": 100,
-            "entrypoint": "src/main.py",
-            "commands": "pip install -r requirements.txt",
-            "specification": "s-0.5vcpu-512mb",
-            "path": "notification-checker"
-        },
-        {
-            "$id": "schedule-notifications",
-            "execute": [],
-            "name": "schedule-notifications",
-            "enabled": true,
-            "logging": true,
-            "runtime": "python-3.12",
-            "scopes": [
-                "documents.read",
-                "documents.write",
-                "execution.write"
-            ],
-            "events": [],
-            "schedule": "0 9 * * *",
-            "timeout": 100,
-            "entrypoint": "src/main.py",
-            "commands": "pip install -r requirements.txt",
-            "specification": "s-0.5vcpu-512mb",
-            "path": "schedule-notifications"
-        },
-        {
-            "$id": "68a48332000273153b51",
-            "execute": [
-                "user:689266490011478edf91"
-            ],
-            "name": "delete-device",
-            "enabled": true,
-            "logging": true,
-            "runtime": "python-3.12",
-            "scopes": [
-                "documents.write"
-            ],
-            "events": [],
-            "schedule": "",
-            "timeout": 15,
-            "entrypoint": "src/main.py",
-            "commands": "pip install -r requirements.txt",
-            "specification": "s-0.5vcpu-512mb",
-            "path": "delete-device"
-        }
-    ]
+  "projectId": "projectbilal",
+  "endpoint": "https://fra.cloud.appwrite.io/v1",
+  "functions": [
+    {
+      "$id": "invoke-notification",
+      "execute": ["any"],
+      "name": "invoke-notification",
+      "enabled": true,
+      "logging": true,
+      "runtime": "python-3.12",
+      "scopes": [],
+      "events": [],
+      "schedule": "",
+      "timeout": 100,
+      "entrypoint": "src/main.py",
+      "commands": "pip install -r requirements.txt",
+      "specification": "s-1vcpu-512mb",
+      "path": "invoke-notification"
+    },
+    {
+      "$id": "notification-checker",
+      "execute": ["any"],
+      "name": "notification-checker",
+      "enabled": true,
+      "logging": true,
+      "runtime": "python-3.12",
+      "scopes": ["documents.read", "execution.write"],
+      "events": [],
+      "schedule": "* * * * *",
+      "timeout": 100,
+      "entrypoint": "src/main.py",
+      "commands": "pip install -r requirements.txt",
+      "specification": "s-1vcpu-512mb",
+      "path": "notification-checker"
+    },
+    {
+      "$id": "schedule-notifications",
+      "execute": [],
+      "name": "schedule-notifications",
+      "enabled": true,
+      "logging": true,
+      "runtime": "python-3.12",
+      "scopes": ["documents.read", "documents.write", "execution.write"],
+      "events": [],
+      "schedule": "0 9 * * *",
+      "timeout": 100,
+      "entrypoint": "src/main.py",
+      "commands": "pip install -r requirements.txt",
+      "specification": "s-1vcpu-512mb",
+      "path": "schedule-notifications"
+    },
+    {
+      "$id": "delete-device",
+      "execute": [],
+      "name": "delete-device",
+      "enabled": true,
+      "logging": true,
+      "runtime": "python-3.12",
+      "scopes": ["documents.write"],
+      "events": [],
+      "schedule": "",
+      "timeout": 15,
+      "entrypoint": "src/main.py",
+      "commands": "pip install -r requirements.txt",
+      "specification": "s-0.5vcpu-512mb",
+      "path": "functions/delete-device"
+    }
+  ]
 }
