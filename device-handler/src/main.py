@@ -23,24 +23,23 @@ def main(context):
             )
 
         # Extract required parameters from request
-        user_id = request_data.get("user_id")
         device_id = request_data.get("device_id")
         operation = request_data.get(
             "operation", "delete"
         )  # Default to delete for backward compatibility
 
-        if not user_id or not device_id:
+        if not device_id:
             return context.res.json(
-                {"success": False, "error": "Both user_id and device_id are required"},
+                {"success": False, "error": "device_id is required"},
                 400,
             )
 
         # Validate operation type
-        if operation not in ["delete", "onboard"]:
+        if operation not in ["delete", "onboard", "status_update"]:
             return context.res.json(
                 {
                     "success": False,
-                    "error": "Operation must be either 'delete' or 'onboard'",
+                    "error": "Operation must be either 'delete', 'onboard', or 'status_update'",
                 },
                 400,
             )
@@ -57,8 +56,19 @@ def main(context):
         if operation == "delete":
             return handle_device_deletion(context, databases, database_id, device_id)
         elif operation == "onboard":
+            # For onboarding, user_id is still required
+            user_id = request_data.get("user_id")
+            if not user_id:
+                return context.res.json(
+                    {"success": False, "error": "user_id is required for onboarding"},
+                    400,
+                )
             return handle_device_onboarding(
                 context, databases, database_id, device_id, user_id, request_data
+            )
+        elif operation == "status_update":
+            return handle_device_status_update(
+                context, databases, database_id, device_id, request_data
             )
 
     except Exception as e:
@@ -135,6 +145,7 @@ def handle_device_deletion(context, databases, database_id, device_id):
                         "user_id": None,
                         "name": "unclaimed_device",
                         "speaker_name": "",
+                        "status": "offline",
                     },
                 )
             else:
@@ -300,5 +311,60 @@ def handle_device_onboarding(
     except Exception as e:
         return context.res.json(
             {"success": False, "error": f"Error during device onboarding: {str(e)}"},
+            500,
+        )
+
+
+def handle_device_status_update(
+    context, databases, database_id, device_id, request_data
+):
+    """Handle device status update operation"""
+    try:
+        status = request_data.get("status")
+        if not status:
+            return context.res.json(
+                {"success": False, "error": "Status is required for status update"}, 400
+            )
+
+        # Update the device document
+        try:
+            device_response = databases.list_documents(
+                database_id=database_id,
+                collection_id="devices",
+                queries=[Query.equal("device_id", device_id)],
+            )
+
+            if device_response["documents"]:
+                device_doc = device_response["documents"][0]
+                databases.update_document(
+                    database_id=database_id,
+                    collection_id="devices",
+                    document_id=device_doc["$id"],
+                    data={"status": status},
+                )
+                return context.res.json(
+                    {
+                        "success": True,
+                        "message": f"Device {device_id} status updated to {status}",
+                        "device_updated": True,
+                    }
+                )
+            else:
+                return context.res.json(
+                    {
+                        "success": False,
+                        "error": f"Device with device_id {device_id} not found",
+                    },
+                    404,
+                )
+        except AppwriteException as e:
+            return context.res.json(
+                {"success": False, "error": f"Error updating device status: {str(e)}"},
+                500,
+            )
+
+    except Exception as e:
+        return context.res.json(
+            {"success": False, "error": f"Error during device status update: {str(e)}"},
             500,
         )
