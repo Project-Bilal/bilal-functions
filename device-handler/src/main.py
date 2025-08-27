@@ -291,11 +291,25 @@ def handle_device_onboarding(
                 500,
             )
 
-        # TODO: Add post-onboarding logic here
-        # - Send welcome notification to user
-        # - Initialize default prayer schedules
-        # - Set up device monitoring
-        # - Log onboarding event
+        # Create 6 new documents in the timings collection for each prayer
+        prayer_names = ["Fajr", "Dhuhr", "Asr", "Maghrib", "Sunset", "Isha"]
+
+        try:
+            for prayer_name in prayer_names:
+                databases.create_document(
+                    database_id=database_id,
+                    collection_id="timings",
+                    data={
+                        "notification": prayer_name,
+                        "device_id": device_id,
+                        "enabled": False,
+                        "volume": "0.5",
+                        "user_id": user_id,
+                    },
+                )
+        except AppwriteException as e:
+            context.log(f"Error creating timing documents: {e}")
+            # Continue with onboarding even if timing creation fails
 
         return context.res.json(
             {
@@ -305,6 +319,7 @@ def handle_device_onboarding(
                 "user_id": user_id,
                 "device_name": device_name,
                 "onboarded": True,
+                "timings_created": True,
             }
         )
 
