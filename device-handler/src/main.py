@@ -284,6 +284,7 @@ def handle_device_onboarding(
                 databases.create_document(
                     database_id=database_id,
                     collection_id="timings",
+                    document_id=f"{device_id}_{prayer_name.lower()}",
                     data={
                         "notification": prayer_name,
                         "device_id": device_id,
