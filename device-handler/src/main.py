@@ -239,12 +239,6 @@ def handle_device_onboarding(
                         "enabled": True,
                         "ip_address": "0.0.0.0",  # Will be updated when device connects
                         "port": None,  # Will be updated when device connects
-                        "onboarded_at": context.req.headers.get(
-                            "x-appwrite-timestamp", ""
-                        ),
-                        "last_updated": context.req.headers.get(
-                            "x-appwrite-timestamp", ""
-                        ),
                     },
                 )
             else:
@@ -270,15 +264,6 @@ def handle_device_onboarding(
                         "enabled": True,
                         "ip_address": "0.0.0.0",
                         "port": None,
-                        "created_at": context.req.headers.get(
-                            "x-appwrite-timestamp", ""
-                        ),
-                        "onboarded_at": context.req.headers.get(
-                            "x-appwrite-timestamp", ""
-                        ),
-                        "last_updated": context.req.headers.get(
-                            "x-appwrite-timestamp", ""
-                        ),
                     },
                 )
 
