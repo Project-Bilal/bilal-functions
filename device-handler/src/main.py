@@ -230,6 +230,7 @@ def handle_device_onboarding(
                     data={
                         "user_id": user_id,
                         "name": device_name,
+                        "status": "pending",
                         "latitude": latitude,
                         "longitude": longitude,
                         "method": method,
@@ -255,6 +256,7 @@ def handle_device_onboarding(
                         "device_id": device_id,
                         "user_id": user_id,
                         "name": device_name,
+                        "status": "pending",
                         "latitude": latitude,
                         "longitude": longitude,
                         "method": method,
