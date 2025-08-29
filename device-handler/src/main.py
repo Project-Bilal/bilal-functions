@@ -279,7 +279,7 @@ def handle_device_onboarding(
             )
 
         # Create 6 new documents in the timings collection for each prayer
-        prayer_names = ["Fajr", "Dhuhr", "Asr", "Maghrib", "Sunset", "Isha"]
+        prayer_names = ["Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"]
 
         try:
             for prayer_name in prayer_names:
