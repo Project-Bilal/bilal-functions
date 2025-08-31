@@ -278,7 +278,7 @@ def handle_device_onboarding(
                 500,
             )
 
-        # Create 6 new documents in the timings collection for each prayer
+        # Create 5 new documents in the timings collection for each prayer
         prayer_names = ["Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"]
 
         try:
@@ -290,9 +290,14 @@ def handle_device_onboarding(
                     data={
                         "notification": prayer_name,
                         "device_id": device_id,
-                        "enabled": False,
+                        "enabled": True,
                         "volume": "0.5",
                         "user_id": user_id,
+                        "audio_id": "https://storage.googleapis.com/athans/athan_1.mp3",
+                        "audio_name": "Mishary Al Afasy Kuwait",
+                        "reminder": "15",
+                        "reminder_audio_id": "https://storage.googleapis.com/athans/Salat_Ibrahimiyya.mp3",
+                        "reminder_audio_name": "Salat Ibrahimiyya",
                     },
                 )
         except AppwriteException as e:
