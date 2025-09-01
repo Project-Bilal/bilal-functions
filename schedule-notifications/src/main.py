@@ -76,6 +76,7 @@ def build_device_object(device, timings):
                 "reminder": t.get("reminder"),
                 "reminder_audio_id": t.get("reminder_audio_id"),
                 "volume": t.get("volume"),
+                "user_id": t.get("user_id"),
             }
             for t in timings
         ],
@@ -147,7 +148,7 @@ def build_notifications_for_device(device, date_str, context):
                 "port": device["port"],
                 "audio_id": timing["audio_id"],
                 "volume": timing["volume"],
-                "user_id": device["user_id"],
+                "user_id": timing["user_id"],
             }
         )
 
@@ -161,7 +162,7 @@ def build_notifications_for_device(device, date_str, context):
                     "port": device["port"],
                     "audio_id": timing["reminder_audio_id"],
                     "volume": timing["volume"],
-                    "user_id": device["user_id"],
+                    "user_id": timing["user_id"],
                 }
             )
 
