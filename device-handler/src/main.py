@@ -39,7 +39,6 @@ def main(context):
             "delete",
             "onboard",
             "status_update",
-            "check_ownership",
             "get_user_devices",
             "update_device_settings",
             "update_timing",
@@ -48,7 +47,7 @@ def main(context):
             return context.res.json(
                 {
                     "success": False,
-                    "error": "Operation must be one of: delete, onboard, status_update, check_ownership, get_user_devices, update_device_settings, update_timing, get_timings",
+                    "error": "Operation must be one of: delete, onboard, status_update, get_user_devices, update_device_settings, update_timing, get_timings",
                 },
                 400,
             )
@@ -78,20 +77,6 @@ def main(context):
         elif operation == "status_update":
             return handle_device_status_update(
                 context, databases, database_id, device_id, request_data
-            )
-        elif operation == "check_ownership":
-            # For ownership check, user_id is required
-            user_id = request_data.get("user_id")
-            if not user_id:
-                return context.res.json(
-                    {
-                        "success": False,
-                        "error": "user_id is required for ownership check",
-                    },
-                    400,
-                )
-            return handle_device_ownership_check(
-                context, databases, database_id, device_id, user_id
             )
         elif operation == "get_user_devices":
             # For getting user devices, user_id is required
@@ -441,63 +426,6 @@ def handle_device_status_update(
     except Exception as e:
         return context.res.json(
             {"success": False, "error": f"Error during device status update: {str(e)}"},
-            500,
-        )
-
-
-def handle_device_ownership_check(context, databases, database_id, device_id, user_id):
-    """Handle device ownership check operation"""
-    try:
-        # Check if device exists and get its ownership info
-        try:
-            device_response = databases.list_documents(
-                database_id=database_id,
-                collection_id="devices",
-                queries=[Query.equal("device_id", device_id)],
-            )
-
-            if device_response["documents"]:
-                # Device exists, check ownership
-                device_doc = device_response["documents"][0]
-                existing_user_id = device_doc.get("user_id")
-
-                # Return ownership information
-                return context.res.json(
-                    {
-                        "success": True,
-                        "device_exists": True,
-                        "is_available": existing_user_id is None
-                        or existing_user_id == user_id,
-                        "current_owner": existing_user_id,
-                        "is_owned_by_user": existing_user_id == user_id,
-                        "device_name": device_doc.get("name", "Unknown"),
-                    }
-                )
-            else:
-                # Device doesn't exist, it's available for onboarding
-                return context.res.json(
-                    {
-                        "success": True,
-                        "device_exists": False,
-                        "is_available": True,
-                        "current_owner": None,
-                        "is_owned_by_user": False,
-                        "device_name": None,
-                    }
-                )
-
-        except AppwriteException as e:
-            return context.res.json(
-                {
-                    "success": False,
-                    "error": f"Error checking device ownership: {str(e)}",
-                },
-                500,
-            )
-
-    except Exception as e:
-        return context.res.json(
-            {"success": False, "error": f"Error during ownership check: {str(e)}"},
             500,
         )
 
