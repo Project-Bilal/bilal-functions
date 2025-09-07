@@ -35,11 +35,11 @@ def main(context):
             )
 
         # Validate operation type
-        if operation not in ["delete", "onboard", "status_update"]:
+        if operation not in ["delete", "onboard", "status_update", "check_ownership"]:
             return context.res.json(
                 {
                     "success": False,
-                    "error": "Operation must be either 'delete', 'onboard', or 'status_update'",
+                    "error": "Operation must be either 'delete', 'onboard', 'status_update', or 'check_ownership'",
                 },
                 400,
             )
@@ -69,6 +69,17 @@ def main(context):
         elif operation == "status_update":
             return handle_device_status_update(
                 context, databases, database_id, device_id, request_data
+            )
+        elif operation == "check_ownership":
+            # For ownership check, user_id is required
+            user_id = request_data.get("user_id")
+            if not user_id:
+                return context.res.json(
+                    {"success": False, "error": "user_id is required for ownership check"},
+                    400,
+                )
+            return handle_device_ownership_check(
+                context, databases, database_id, device_id, user_id
             )
 
     except Exception as e:
@@ -192,20 +203,8 @@ def handle_device_onboarding(
         school = request_data.get("school", "0")
         speaker_name = request_data.get("speaker_name", "")
 
-        # TODO: Add device validation logic here
-        # - Check if device_id is valid format
-        # - Verify device is not already claimed by another user
-        # - Validate device capabilities/permissions
-
-        # TODO: Add user validation logic here
-        # - Check if user_id is valid
-        # - Verify user has permission to claim devices
-        # - Check user's device limit if applicable
-
-        # TODO: Add device configuration logic here
-        # - Set default prayer times
-        # - Configure timezone settings
-        # - Set up initial notification preferences
+        # Device validation, user validation, and configuration logic
+        # would be implemented here in a production environment
 
         # Check if device already exists
         try:
@@ -216,13 +215,21 @@ def handle_device_onboarding(
             )
 
             if device_response["documents"]:
-                # Device exists, update it
+                # Device exists, check ownership
                 device_doc = device_response["documents"][0]
+                existing_user_id = device_doc.get("user_id")
 
-                # TODO: Add conflict resolution logic here
-                # - Check if device is already claimed by another user
-                # - Handle device transfer scenarios
+                # Check if device is already claimed by another user
+                if existing_user_id and existing_user_id != user_id:
+                    return context.res.json(
+                        {
+                            "success": False,
+                            "error": f"Device is already claimed by another user. Cannot onboard device {device_id}",
+                        },
+                        409,  # Conflict status code
+                    )
 
+                # Device is either unclaimed (user_id is null) or belongs to current user
                 databases.update_document(
                     database_id=database_id,
                     collection_id="devices",
@@ -244,9 +251,6 @@ def handle_device_onboarding(
                 )
             else:
                 # Device doesn't exist, create it
-                # TODO: Add device creation logic here
-                # - Validate device_id format
-                # - Set up initial device configuration
 
                 databases.create_document(
                     database_id=database_id,
@@ -374,5 +378,63 @@ def handle_device_status_update(
     except Exception as e:
         return context.res.json(
             {"success": False, "error": f"Error during device status update: {str(e)}"},
+            500,
+        )
+
+
+def handle_device_ownership_check(
+    context, databases, database_id, device_id, user_id
+):
+    """Handle device ownership check operation"""
+    try:
+        # Check if device exists and get its ownership info
+        try:
+            device_response = databases.list_documents(
+                database_id=database_id,
+                collection_id="devices",
+                queries=[Query.equal("device_id", device_id)],
+            )
+
+            if device_response["documents"]:
+                # Device exists, check ownership
+                device_doc = device_response["documents"][0]
+                existing_user_id = device_doc.get("user_id")
+
+                # Return ownership information
+                return context.res.json(
+                    {
+                        "success": True,
+                        "device_exists": True,
+                        "is_available": existing_user_id is None or existing_user_id == user_id,
+                        "current_owner": existing_user_id,
+                        "is_owned_by_user": existing_user_id == user_id,
+                        "device_name": device_doc.get("name", "Unknown"),
+                    }
+                )
+            else:
+                # Device doesn't exist, it's available for onboarding
+                return context.res.json(
+                    {
+                        "success": True,
+                        "device_exists": False,
+                        "is_available": True,
+                        "current_owner": None,
+                        "is_owned_by_user": False,
+                        "device_name": None,
+                    }
+                )
+
+        except AppwriteException as e:
+            return context.res.json(
+                {
+                    "success": False,
+                    "error": f"Error checking device ownership: {str(e)}",
+                },
+                500,
+            )
+
+    except Exception as e:
+        return context.res.json(
+            {"success": False, "error": f"Error during ownership check: {str(e)}"},
             500,
         )
