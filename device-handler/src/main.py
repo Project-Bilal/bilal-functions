@@ -275,31 +275,35 @@ def handle_device_onboarding(
                 500,
             )
 
-        # Create 5 new documents in the timings collection for each prayer
-        prayer_names = ["Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"]
+        # Only create timings if device is being claimed (user_id is not null)
+        timings_created = False
+        if user_id is not None:
+            # Create 5 new documents in the timings collection for each prayer
+            prayer_names = ["Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"]
 
-        try:
-            for prayer_name in prayer_names:
-                databases.create_document(
-                    database_id=database_id,
-                    collection_id="timings",
-                    document_id=f"{device_id}_{prayer_name.lower()}",
-                    data={
-                        "notification": prayer_name,
-                        "device_id": device_id,
-                        "enabled": True,
-                        "volume": "0.5",
-                        "user_id": user_id,
-                        "audio_id": "https://storage.googleapis.com/athans/athan_1.mp3",
-                        "audio_name": "Mishary Al Afasy Kuwait",
-                        "reminder": "15",
-                        "reminder_audio_id": "https://storage.googleapis.com/athans/Salat_Ibrahimiyya.mp3",
-                        "reminder_audio_name": "Salat Ibrahimiyya",
-                    },
-                )
-        except AppwriteException as e:
-            context.log(f"Error creating timing documents: {e}")
-            # Continue with onboarding even if timing creation fails
+            try:
+                for prayer_name in prayer_names:
+                    databases.create_document(
+                        database_id=database_id,
+                        collection_id="timings",
+                        document_id=f"{device_id}_{prayer_name.lower()}",
+                        data={
+                            "notification": prayer_name,
+                            "device_id": device_id,
+                            "enabled": True,
+                            "volume": "0.5",
+                            "user_id": user_id,
+                            "audio_id": "https://storage.googleapis.com/athans/athan_1.mp3",
+                            "audio_name": "Mishary Al Afasy Kuwait",
+                            "reminder": "15",
+                            "reminder_audio_id": "https://storage.googleapis.com/athans/Salat_Ibrahimiyya.mp3",
+                            "reminder_audio_name": "Salat Ibrahimiyya",
+                        },
+                    )
+                timings_created = True
+            except AppwriteException as e:
+                context.log(f"Error creating timing documents: {e}")
+                # Continue with onboarding even if timing creation fails
 
         return context.res.json(
             {
@@ -309,7 +313,7 @@ def handle_device_onboarding(
                 "user_id": user_id,
                 "device_name": device_name,
                 "onboarded": True,
-                "timings_created": True,
+                "timings_created": timings_created,
             }
         )
 
