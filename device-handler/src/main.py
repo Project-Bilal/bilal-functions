@@ -35,11 +35,11 @@ def main(context):
             )
 
         # Validate operation type
-        if operation not in ["delete", "onboard", "status_update", "check_ownership"]:
+        if operation not in ["delete", "onboard", "status_update", "check_ownership", "get_user_devices", "update_device_settings", "update_timing", "get_timings"]:
             return context.res.json(
                 {
                     "success": False,
-                    "error": "Operation must be either 'delete', 'onboard', 'status_update', or 'check_ownership'",
+                    "error": "Operation must be one of: delete, onboard, status_update, check_ownership, get_user_devices, update_device_settings, update_timing, get_timings",
                 },
                 400,
             )
@@ -79,6 +79,50 @@ def main(context):
                     400,
                 )
             return handle_device_ownership_check(
+                context, databases, database_id, device_id, user_id
+            )
+        elif operation == "get_user_devices":
+            # For getting user devices, user_id is required
+            user_id = request_data.get("user_id")
+            if not user_id:
+                return context.res.json(
+                    {"success": False, "error": "user_id is required for get_user_devices"},
+                    400,
+                )
+            return handle_get_user_devices(
+                context, databases, database_id, user_id
+            )
+        elif operation == "update_device_settings":
+            # For updating device settings, user_id is required
+            user_id = request_data.get("user_id")
+            if not user_id:
+                return context.res.json(
+                    {"success": False, "error": "user_id is required for update_device_settings"},
+                    400,
+                )
+            return handle_update_device_settings(
+                context, databases, database_id, device_id, user_id, request_data
+            )
+        elif operation == "update_timing":
+            # For updating timing, user_id is required
+            user_id = request_data.get("user_id")
+            if not user_id:
+                return context.res.json(
+                    {"success": False, "error": "user_id is required for update_timing"},
+                    400,
+                )
+            return handle_update_timing(
+                context, databases, database_id, user_id, request_data
+            )
+        elif operation == "get_timings":
+            # For getting timings, user_id is required
+            user_id = request_data.get("user_id")
+            if not user_id:
+                return context.res.json(
+                    {"success": False, "error": "user_id is required for get_timings"},
+                    400,
+                )
+            return handle_get_timings(
                 context, databases, database_id, device_id, user_id
             )
 
@@ -436,5 +480,298 @@ def handle_device_ownership_check(
     except Exception as e:
         return context.res.json(
             {"success": False, "error": f"Error during ownership check: {str(e)}"},
+            500,
+        )
+
+
+def handle_get_user_devices(context, databases, database_id, user_id):
+    """Handle getting user devices operation"""
+    try:
+        # Get all devices for the user
+        try:
+            device_response = databases.list_documents(
+                database_id=database_id,
+                collection_id="devices",
+                queries=[Query.equal("user_id", user_id)],
+            )
+
+            devices = []
+            if device_response["documents"]:
+                for doc in device_response["documents"]:
+                    devices.append({
+                        "$id": doc["$id"],
+                        "device_id": doc.get("device_id", ""),
+                        "user_id": doc.get("user_id", ""),
+                        "name": doc.get("name", ""),
+                        "enabled": doc.get("enabled", False),
+                        "latitude": doc.get("latitude"),
+                        "longitude": doc.get("longitude"),
+                        "method": doc.get("method"),
+                        "school": doc.get("school"),
+                        "ip_address": doc.get("ip_address"),
+                        "port": doc.get("port"),
+                        "speaker_name": doc.get("speaker_name"),
+                        "status": doc.get("status"),
+                    })
+
+            return context.res.json(
+                {
+                    "success": True,
+                    "devices": devices,
+                    "count": len(devices),
+                }
+            )
+
+        except AppwriteException as e:
+            return context.res.json(
+                {
+                    "success": False,
+                    "error": f"Error getting user devices: {str(e)}",
+                },
+                500,
+            )
+
+    except Exception as e:
+        return context.res.json(
+            {"success": False, "error": f"Error during get_user_devices: {str(e)}"},
+            500,
+        )
+
+
+def handle_update_device_settings(
+    context, databases, database_id, device_id, user_id, request_data
+):
+    """Handle updating device settings operation"""
+    try:
+        # First verify the device belongs to the user
+        try:
+            device_response = databases.list_documents(
+                database_id=database_id,
+                collection_id="devices",
+                queries=[Query.equal("device_id", device_id)],
+            )
+
+            if not device_response["documents"]:
+                return context.res.json(
+                    {
+                        "success": False,
+                        "error": f"Device with device_id {device_id} not found",
+                    },
+                    404,
+                )
+
+            device_doc = device_response["documents"][0]
+            if device_doc.get("user_id") != user_id:
+                return context.res.json(
+                    {
+                        "success": False,
+                        "error": "You don't have permission to update this device",
+                    },
+                    403,
+                )
+
+            # Extract update data from request
+            update_data = {}
+            allowed_fields = [
+                "name", "enabled", "latitude", "longitude", "method", 
+                "school", "ip_address", "port", "speaker_name", "status"
+            ]
+            
+            for field in allowed_fields:
+                if field in request_data:
+                    update_data[field] = request_data[field]
+
+            if not update_data:
+                return context.res.json(
+                    {
+                        "success": False,
+                        "error": "No valid fields provided for update",
+                    },
+                    400,
+                )
+
+            # Update the device document
+            databases.update_document(
+                database_id=database_id,
+                collection_id="devices",
+                document_id=device_doc["$id"],
+                data=update_data,
+            )
+
+            return context.res.json(
+                {
+                    "success": True,
+                    "message": f"Device {device_id} settings updated successfully",
+                    "updated_fields": list(update_data.keys()),
+                }
+            )
+
+        except AppwriteException as e:
+            return context.res.json(
+                {
+                    "success": False,
+                    "error": f"Error updating device settings: {str(e)}",
+                },
+                500,
+            )
+
+    except Exception as e:
+        return context.res.json(
+            {"success": False, "error": f"Error during update_device_settings: {str(e)}"},
+            500,
+        )
+
+
+def handle_update_timing(context, databases, database_id, user_id, request_data):
+    """Handle updating timing operation"""
+    try:
+        timing_id = request_data.get("timing_id")
+        if not timing_id:
+            return context.res.json(
+                {"success": False, "error": "timing_id is required for update_timing"},
+                400,
+            )
+
+        # First verify the timing belongs to the user
+        try:
+            timing_response = databases.get_document(
+                database_id=database_id,
+                collection_id="timings",
+                document_id=timing_id,
+            )
+
+            if timing_response.get("user_id") != user_id:
+                return context.res.json(
+                    {
+                        "success": False,
+                        "error": "You don't have permission to update this timing",
+                    },
+                    403,
+                )
+
+            # Extract update data from request
+            update_data = {}
+            allowed_fields = [
+                "enabled", "notification", "audio_id", "reminder", 
+                "reminder_audio_id", "volume"
+            ]
+            
+            for field in allowed_fields:
+                if field in request_data:
+                    update_data[field] = request_data[field]
+
+            if not update_data:
+                return context.res.json(
+                    {
+                        "success": False,
+                        "error": "No valid fields provided for update",
+                    },
+                    400,
+                )
+
+            # Update the timing document
+            databases.update_document(
+                database_id=database_id,
+                collection_id="timings",
+                document_id=timing_id,
+                data=update_data,
+            )
+
+            return context.res.json(
+                {
+                    "success": True,
+                    "message": f"Timing {timing_id} updated successfully",
+                    "updated_fields": list(update_data.keys()),
+                }
+            )
+
+        except AppwriteException as e:
+            return context.res.json(
+                {
+                    "success": False,
+                    "error": f"Error updating timing: {str(e)}",
+                },
+                500,
+            )
+
+    except Exception as e:
+        return context.res.json(
+            {"success": False, "error": f"Error during update_timing: {str(e)}"},
+            500,
+        )
+
+
+def handle_get_timings(context, databases, database_id, device_id, user_id):
+    """Handle getting timings for a device operation"""
+    try:
+        # First verify the device belongs to the user
+        try:
+            device_response = databases.list_documents(
+                database_id=database_id,
+                collection_id="devices",
+                queries=[Query.equal("device_id", device_id)],
+            )
+
+            if not device_response["documents"]:
+                return context.res.json(
+                    {
+                        "success": False,
+                        "error": f"Device with device_id {device_id} not found",
+                    },
+                    404,
+                )
+
+            device_doc = device_response["documents"][0]
+            if device_doc.get("user_id") != user_id:
+                return context.res.json(
+                    {
+                        "success": False,
+                        "error": "You don't have permission to access this device's timings",
+                    },
+                    403,
+                )
+
+            # Get all timings for this device
+            timings_response = databases.list_documents(
+                database_id=database_id,
+                collection_id="timings",
+                queries=[Query.equal("device_id", device_id)],
+            )
+
+            timings = []
+            if timings_response["documents"]:
+                for doc in timings_response["documents"]:
+                    timings.append({
+                        "$id": doc["$id"],
+                        "device_id": doc.get("device_id", ""),
+                        "user_id": doc.get("user_id", ""),
+                        "enabled": doc.get("enabled", False),
+                        "notification": doc.get("notification", ""),
+                        "audio_id": doc.get("audio_id", ""),
+                        "reminder": doc.get("reminder", ""),
+                        "reminder_audio_id": doc.get("reminder_audio_id", ""),
+                        "volume": doc.get("volume", ""),
+                    })
+
+            return context.res.json(
+                {
+                    "success": True,
+                    "timings": timings,
+                    "count": len(timings),
+                }
+            )
+
+        except AppwriteException as e:
+            return context.res.json(
+                {
+                    "success": False,
+                    "error": f"Error getting timings: {str(e)}",
+                },
+                500,
+            )
+
+    except Exception as e:
+        return context.res.json(
+            {"success": False, "error": f"Error during get_timings: {str(e)}"},
             500,
         )
