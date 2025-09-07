@@ -60,13 +60,9 @@ def main(context):
         if operation == "delete":
             return handle_device_deletion(context, databases, database_id, device_id)
         elif operation == "onboard":
-            # For onboarding, user_id is still required
+            # For onboarding, user_id can be null for unclaimed devices
             user_id = request_data.get("user_id")
-            if not user_id:
-                return context.res.json(
-                    {"success": False, "error": "user_id is required for onboarding"},
-                    400,
-                )
+            # Allow null user_id for unclaimed devices
             return handle_device_onboarding(
                 context, databases, database_id, device_id, user_id, request_data
             )
