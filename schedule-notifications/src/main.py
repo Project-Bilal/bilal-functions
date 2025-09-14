@@ -76,6 +76,9 @@ def build_device_object(device, timings):
                 "audio_id": t.get("audio_id"),
                 "reminder": t.get("reminder"),
                 "reminder_audio_id": t.get("reminder_audio_id"),
+                "reminder_enabled": t.get(
+                    "reminder_enabled", True
+                ),  # Include reminder_enabled field
                 "volume": t.get("volume"),
                 "user_id": t.get("user_id"),
             }
@@ -140,6 +143,11 @@ def build_notifications_for_device(device, date_str, context):
         reminder = int(timing.get("reminder") or 0)
         utc_time, utc_time_rem = get_utc_times(time_str, reminder)
 
+        # Always calculate reminder time, even if reminder is 0
+        # If reminder is 0, utc_time_rem will be the same as utc_time
+        if reminder == 0:
+            utc_time_rem = utc_time
+
         # Main notification
         notifications.append(
             {
@@ -156,22 +164,21 @@ def build_notifications_for_device(device, date_str, context):
             }
         )
 
-        # Reminder notification
-        if utc_time_rem:
-            notifications.append(
-                {
-                    "device_id": device["device_id"],
-                    "timestampUTC": utc_time_rem,
-                    "ip_address": device["ip_address"],
-                    "port": device["port"],
-                    "audio_id": timing["reminder_audio_id"],
-                    "volume": timing["volume"],
-                    "user_id": timing["user_id"],
-                    "timing_id": timing["timing_id"],
-                    "type": "reminder",
-                    "enabled": True,
-                }
-            )
+        # Reminder notification - always create, but set enabled based on reminder_enabled
+        notifications.append(
+            {
+                "device_id": device["device_id"],
+                "timestampUTC": utc_time_rem,
+                "ip_address": device["ip_address"],
+                "port": device["port"],
+                "audio_id": timing["reminder_audio_id"],
+                "volume": timing["volume"],
+                "user_id": timing["user_id"],
+                "timing_id": timing["timing_id"],
+                "type": "reminder",
+                "enabled": timing.get("reminder_enabled", True),
+            }
+        )
 
     return notifications
 

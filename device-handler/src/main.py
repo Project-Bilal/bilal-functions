@@ -294,6 +294,7 @@ def handle_device_onboarding(
                             "reminder": "15",
                             "reminder_audio_id": "https://storage.googleapis.com/athans/Salat_Ibrahimiyya.mp3",
                             "reminder_audio_name": "Salat Ibrahimiyya",
+                            "reminder_enabled": True,
                         },
                     )
                 timings_created = True
