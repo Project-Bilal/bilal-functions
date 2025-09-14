@@ -22,15 +22,26 @@ def main(context):
     databases = Databases(client)
 
     try:
-        # Query for notifications with timestampUTC equal to current_time
+        # Query for enabled notifications with timestampUTC equal to current_time
         notifications = databases.list_documents(
             database_id="projectbilal",
             collection_id="notifications",
-            queries=[Query.equal("timestampUTC", current_time)],
+            queries=[
+                Query.equal("timestampUTC", current_time),
+                Query.equal("enabled", True),
+            ],
         )
         if notifications["total"] > 0:
             functions = Functions(client)
+            processed_count = 0
             for notification in notifications["documents"]:
+                # Skip disabled notifications (safety check)
+                if not notification.get("enabled", True):
+                    context.log(
+                        f"Skipping disabled notification: {notification['$id']}"
+                    )
+                    continue
+
                 # Prepare notification data
                 notification_data = {
                     "device_id": notification["device_id"],
@@ -48,13 +59,18 @@ def main(context):
                         body=json.dumps(notification_data),
                     )
                     context.log(f"Sent notification to device: {notification['$id']}")
+                    processed_count += 1
                 except Exception as e:
                     context.error(
                         f"Failed to send notification {notification['$id']}: {str(e)}"
                     )
 
             return context.res.json(
-                {"success": True, "total_notifications": notifications["total"]}
+                {
+                    "success": True,
+                    "total_notifications": notifications["total"],
+                    "processed_notifications": processed_count,
+                }
             )
 
         return context.res.json(
