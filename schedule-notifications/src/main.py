@@ -152,6 +152,7 @@ def build_notifications_for_device(device, date_str, context):
                 "user_id": timing["user_id"],
                 "timing_id": timing["timing_id"],
                 "type": "notification",
+                "enabled": True,
             }
         )
 
@@ -168,6 +169,7 @@ def build_notifications_for_device(device, date_str, context):
                     "user_id": timing["user_id"],
                     "timing_id": timing["timing_id"],
                     "type": "reminder",
+                    "enabled": True,
                 }
             )
 
