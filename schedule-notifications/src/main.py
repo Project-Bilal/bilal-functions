@@ -108,10 +108,12 @@ def fetch_prayer_time(date_str, lat, lon, method, context):
     url = f"https://api.aladhan.com/v1/timings/{date_str}?latitude={lat}&longitude={lon}&method={method}&iso8601=true"
     context.log(f"🌐 Making API call to: {url}")
     context.log(f"⏱️ API call started at: {datetime.now(timezone.utc).isoformat()}")
-    
+
     try:
         response = requests.get(url, timeout=30)  # Increased timeout to 30 seconds
-        context.log(f"⏱️ API call completed at: {datetime.now(timezone.utc).isoformat()}")
+        context.log(
+            f"⏱️ API call completed at: {datetime.now(timezone.utc).isoformat()}"
+        )
         context.log(f"📊 API response status: {response.status_code}")
         response.raise_for_status()
         context.log("✅ API call successful")
@@ -126,7 +128,7 @@ def fetch_prayer_time(date_str, lat, lon, method, context):
 
 def build_notifications_for_device(device, date_str, context):
     """Build notification payloads for a single device."""
-    device_id = device.get('device_id', 'unknown')
+    device_id = device.get("device_id", "unknown")
     context.log(f"🔨 Building notifications for device: {device_id}")
     notifications = []
 
@@ -144,7 +146,9 @@ def build_notifications_for_device(device, date_str, context):
         )
         context.log(f"✅ Successfully fetched prayer times for device {device_id}")
     except Exception as e:
-        context.error(f"❌ Failed to fetch prayer times for device {device_id}: {str(e)}")
+        context.error(
+            f"❌ Failed to fetch prayer times for device {device_id}: {str(e)}"
+        )
         return notifications  # Return empty list to skip
 
     for timing in device["timings"]:
@@ -248,14 +252,14 @@ def main(context):
         for i, device in enumerate(devices):
             device_id = device.get("device_id")
             context.log(f"📱 Processing device {i+1}/{len(devices)}: {device_id}")
-            
+
             if not device_id:
                 context.log(f"⚠️ Device {i+1} has no device_id, skipping")
                 continue
 
             device_timings = timings_by_device.get(device_id, [])
             context.log(f"📋 Device {device_id} has {len(device_timings)} timings")
-            
+
             if not device_timings:
                 context.log(f"⚠️ Device {device_id} has no timings, skipping")
                 continue
@@ -268,7 +272,9 @@ def main(context):
             notifications = build_notifications_for_device(
                 device_obj, date_str, context
             )
-            context.log(f"✅ Device {device_id} generated {len(notifications)} notifications")
+            context.log(
+                f"✅ Device {device_id} generated {len(notifications)} notifications"
+            )
             all_notifications.extend(notifications)
 
         context.log(f"📊 Total prepared notifications: {len(all_notifications)}")
@@ -278,7 +284,9 @@ def main(context):
             device_ids = list(
                 set(notification["device_id"] for notification in all_notifications)
             )
-            context.log(f"🗑️ Deleting existing notifications for {len(device_ids)} devices: {device_ids}")
+            context.log(
+                f"🗑️ Deleting existing notifications for {len(device_ids)} devices: {device_ids}"
+            )
 
             # Delete existing notifications for these devices
             context.log("🗑️ Starting deletion of existing notifications...")
@@ -286,7 +294,9 @@ def main(context):
             context.log("✅ Finished deleting existing notifications")
 
             try:
-                context.log(f"💾 Upserting {len(all_notifications)} notifications to database...")
+                context.log(
+                    f"💾 Upserting {len(all_notifications)} notifications to database..."
+                )
                 databases.upsert_documents(
                     database_id="projectbilal",
                     collection_id="notifications",
