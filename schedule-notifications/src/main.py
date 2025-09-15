@@ -4,6 +4,7 @@ from appwrite.query import Query
 from datetime import datetime, timezone, timedelta
 import requests
 import os
+import json
 from collections import defaultdict
 
 
@@ -191,8 +192,26 @@ def main(context):
     databases = Databases(client)
 
     try:
-        # Fetch all data in one go
-        devices = fetch_enabled_devices(databases)
+        # Check if specific device_id is provided
+        request_data = context.req.body_json if context.req.body else {}
+        target_device_id = request_data.get("device_id")
+
+        if target_device_id:
+            # Process only the specified device
+            devices = databases.list_documents(
+                database_id="projectbilal",
+                collection_id="devices",
+                queries=[
+                    Query.equal("enabled", True),
+                    Query.equal("device_id", target_device_id),
+                ],
+            )["documents"]
+            context.log(f"Processing specific device: {target_device_id}")
+        else:
+            # Process all devices (current behavior)
+            devices = fetch_enabled_devices(databases)
+            context.log(f"Processing all enabled devices")
+
         timings = fetch_enabled_timings(databases)
         context.log(f"Found {len(devices)} devices and {len(timings)} timings")
 
