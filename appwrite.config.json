@@ -39,7 +39,9 @@
         },
         {
             "$id": "schedule-notifications",
-            "execute": [],
+            "execute": [
+                "users"
+            ],
             "name": "schedule-notifications",
             "enabled": true,
             "logging": true,
