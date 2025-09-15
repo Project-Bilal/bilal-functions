@@ -117,7 +117,7 @@ def build_notifications_for_device(device, date_str, context):
     notifications = []
 
     # Check for required fields before making API call
-    required_fields = ["latitude", "longitude", "method", "ip_address", "port"]
+    required_fields = ["latitude", "longitude", "method"]
     for field in required_fields:
         if not device.get(field):
             context.log(
@@ -154,8 +154,8 @@ def build_notifications_for_device(device, date_str, context):
             {
                 "device_id": device["device_id"],
                 "timestampUTC": utc_time,
-                "ip_address": device["ip_address"],
-                "port": device["port"],
+                "ip_address": device.get("ip_address"),
+                "port": device.get("port"),
                 "audio_id": timing["audio_id"],
                 "volume": timing["volume"],
                 "user_id": timing["user_id"],
@@ -170,8 +170,8 @@ def build_notifications_for_device(device, date_str, context):
             {
                 "device_id": device["device_id"],
                 "timestampUTC": utc_time_rem,
-                "ip_address": device["ip_address"],
-                "port": device["port"],
+                "ip_address": device.get("ip_address"),
+                "port": device.get("port"),
                 "audio_id": timing["reminder_audio_id"],
                 "volume": timing["volume"],
                 "user_id": timing["user_id"],
