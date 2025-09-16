@@ -130,6 +130,23 @@ def main(context):
             port = data["port"]
             device_id = data["device_id"]
 
+            # Validate IP address and port before proceeding
+            if not ip_address or ip_address == "0.0.0.0" or not port:
+                context.log(
+                    f"⚠️ Skipping notification for device {device_id} - invalid IP/port (IP: {ip_address}, Port: {port})"
+                )
+                return context.res.json(
+                    {
+                        "success": False,
+                        "error": "Device is offline or has invalid network configuration",
+                        "device_id": device_id,
+                        "ip_address": ip_address,
+                        "port": port,
+                        "message": "Notification skipped - device not reachable",
+                    },
+                    200,  # Return 200 since this is expected behavior, not an error
+                )
+
             # Create the formatted message
             message_obj = {
                 "action": "play",

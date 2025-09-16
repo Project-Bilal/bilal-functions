@@ -201,6 +201,51 @@ def build_notifications_for_device(device, date_str, context):
 
 
 def main(context):
+    # Quick test endpoint - DELETE THIS LATER
+    if context.req.path == "/test":
+        context.log("🧪 Test endpoint called - testing network connectivity")
+
+        try:
+            # Test 1: Simple HTTP request
+            context.log("🌐 Testing basic HTTP connectivity...")
+            response = requests.get("https://httpbin.org/get", timeout=10)
+            context.log(f"✅ Basic HTTP test: {response.status_code}")
+
+            # Test 2: Aladhan API test
+            context.log("🕌 Testing Aladhan API connectivity...")
+            test_url = "https://api.aladhan.com/v1/timings/16-09-2025?latitude=47.618962&longitude=-122.337647&method=2&iso8601=true"
+            aladhan_response = requests.get(test_url, timeout=10)
+            context.log(f"✅ Aladhan API test: {aladhan_response.status_code}")
+
+            return context.res.json(
+                {
+                    "success": True,
+                    "message": "Network connectivity test successful!",
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "tests": {
+                        "basic_http": {
+                            "status": response.status_code,
+                            "url": "https://httpbin.org/get",
+                        },
+                        "aladhan_api": {
+                            "status": aladhan_response.status_code,
+                            "url": test_url,
+                        },
+                    },
+                }
+            )
+
+        except Exception as e:
+            context.error(f"❌ Network test failed: {str(e)}")
+            return context.res.json(
+                {
+                    "success": False,
+                    "message": "Network connectivity test failed",
+                    "error": str(e),
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                }
+            )
+
     context.log("🚀 Starting schedule-notifications function")
     now = datetime.now(timezone.utc)
     date_str = now.strftime("%d-%m-%Y")
