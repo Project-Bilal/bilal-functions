@@ -68,11 +68,11 @@ def main(context):
             response = requests.get("https://httpbin.org/get", timeout=10)
             context.log(f"✅ Basic HTTP test: {response.status_code}")
 
-            # Test 2: Aladhan API test
-            context.log("🕌 Testing Aladhan API connectivity...")
-            test_url = "https://api.aladhan.com/v1/timings/16-09-2025?latitude=47.618962&longitude=-122.337647&method=2&iso8601=true"
-            aladhan_response = requests.get(test_url, timeout=10)
-            context.log(f"✅ Aladhan API test: {aladhan_response.status_code}")
+            # Test 2: Simple JSON API test
+            context.log("📡 Testing simple JSON API connectivity...")
+            test_url = "https://jsonplaceholder.typicode.com/posts/1"
+            json_response = requests.get(test_url, timeout=10)
+            context.log(f"✅ JSON API test: {json_response.status_code}")
 
             return context.res.json(
                 {
@@ -84,8 +84,8 @@ def main(context):
                             "status": response.status_code,
                             "url": "https://httpbin.org/get",
                         },
-                        "aladhan_api": {
-                            "status": aladhan_response.status_code,
+                        "json_api": {
+                            "status": json_response.status_code,
                             "url": test_url,
                         },
                     },
