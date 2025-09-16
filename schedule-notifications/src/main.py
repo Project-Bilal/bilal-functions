@@ -106,7 +106,14 @@ def delete_existing_notifications(databases, device_ids):
 def fetch_prayer_time(date_str, lat, lon, method, context):
     """Fetch prayer timings from Aladhan API."""
     url = f"https://api.aladhan.com/v1/timings/{date_str}?latitude={lat}&longitude={lon}&method={method}&iso8601=true"
-    context.log(f"🌐 Making API call to: {url}")
+
+    # Enhanced URL logging
+    context.log("=" * 80)
+    context.log(f"🔗 FULL ALADHAN API URL: {url}")
+    context.log(f"📅 Date: {date_str}")
+    context.log(f"📍 Coordinates: {lat}, {lon}")
+    context.log(f"🕌 Method: {method}")
+    context.log("=" * 80)
     context.log(f"⏱️ API call started at: {datetime.now(timezone.utc).isoformat()}")
 
     try:

@@ -56,53 +56,6 @@ def send_mqtt_message(topic, message, broker="broker.hivemq.com", port=1883):
 
 # This Appwrite function will be executed every time your function is triggered
 def main(context):
-    # Quick test endpoint - DELETE THIS LATER
-    if context.req.path == "/test":
-        context.log("🧪 Test endpoint called - testing network connectivity")
-
-        try:
-            # Test 1: Simple HTTP request
-            context.log("🌐 Testing basic HTTP connectivity...")
-            import requests
-
-            response = requests.get("https://httpbin.org/get", timeout=10)
-            context.log(f"✅ Basic HTTP test: {response.status_code}")
-
-            # Test 2: Simple JSON API test
-            context.log("📡 Testing simple JSON API connectivity...")
-            test_url = "https://jsonplaceholder.typicode.com/posts/1"
-            json_response = requests.get(test_url, timeout=10)
-            context.log(f"✅ JSON API test: {json_response.status_code}")
-
-            return context.res.json(
-                {
-                    "success": True,
-                    "message": "Network connectivity test successful!",
-                    "timestamp": "2024-01-15T10:30:00.000Z",
-                    "tests": {
-                        "basic_http": {
-                            "status": response.status_code,
-                            "url": "https://httpbin.org/get",
-                        },
-                        "json_api": {
-                            "status": json_response.status_code,
-                            "url": test_url,
-                        },
-                    },
-                }
-            )
-
-        except Exception as e:
-            context.error(f"❌ Network test failed: {str(e)}")
-            return context.res.json(
-                {
-                    "success": False,
-                    "message": "Network connectivity test failed",
-                    "error": str(e),
-                    "timestamp": "2024-01-15T10:30:00.000Z",
-                }
-            )
-
     try:
         data = context.req.body_json
 
