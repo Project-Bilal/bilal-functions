@@ -211,11 +211,11 @@ def main(context):
             response = requests.get("https://httpbin.org/get", timeout=10)
             context.log(f"✅ Basic HTTP test: {response.status_code}")
 
-            # Test 2: Simple JSON API test
-            context.log("📡 Testing simple JSON API connectivity...")
-            test_url = "https://jsonplaceholder.typicode.com/posts/1"
-            json_response = requests.get(test_url, timeout=10)
-            context.log(f"✅ JSON API test: {json_response.status_code}")
+            # Test 2: MuslimSalat API test
+            context.log("🕌 Testing MuslimSalat API connectivity...")
+            test_url = "https://muslimsalat.com/london.json?key=5a90e396ea3b8ee1e8368485cf5f5894"
+            muslimsalat_response = requests.get(test_url, timeout=10)
+            context.log(f"✅ MuslimSalat API test: {muslimsalat_response.status_code}")
 
             return context.res.json(
                 {
@@ -227,9 +227,14 @@ def main(context):
                             "status": response.status_code,
                             "url": "https://httpbin.org/get",
                         },
-                        "json_api": {
-                            "status": json_response.status_code,
+                        "muslimsalat_api": {
+                            "status": muslimsalat_response.status_code,
                             "url": test_url,
+                            "raw_response": (
+                                muslimsalat_response.json()
+                                if muslimsalat_response.status_code == 200
+                                else None
+                            ),
                         },
                     },
                 }
