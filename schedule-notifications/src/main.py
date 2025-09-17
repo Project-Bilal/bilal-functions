@@ -117,19 +117,45 @@ def fetch_prayer_time(date_str, lat, lon, method, context):
     context.log(f"⏱️ API call started at: {datetime.now(timezone.utc).isoformat()}")
 
     try:
+        context.log("🚀 Starting requests.get() call...")
         response = requests.get(url, timeout=30)  # Increased timeout to 30 seconds
         context.log(
             f"⏱️ API call completed at: {datetime.now(timezone.utc).isoformat()}"
         )
         context.log(f"📊 API response status: {response.status_code}")
+        context.log(f"📏 Response content length: {len(response.content)}")
+        context.log(f"📄 Response headers: {dict(response.headers)}")
+
+        # Log first 500 characters of response
+        response_text = response.text[:500]
+        context.log(f"📝 Response preview: {response_text}")
+
         response.raise_for_status()
         context.log("✅ API call successful")
-        return response.json()["data"]["timings"]
+
+        # Try to parse JSON and log the structure
+        json_data = response.json()
+        context.log(f"📋 JSON keys: {list(json_data.keys())}")
+        if "data" in json_data and "timings" in json_data["data"]:
+            context.log(
+                f"🕌 Timings found: {list(json_data['data']['timings'].keys())}"
+            )
+            return json_data["data"]["timings"]
+        else:
+            context.error(f"❌ Unexpected JSON structure: {json_data}")
+            return {}
+
     except requests.exceptions.Timeout:
         context.error("⏰ API call timed out after 30 seconds")
+        context.error("🔍 This suggests the API is blocking or very slow")
         raise
     except requests.exceptions.RequestException as e:
         context.error(f"🌐 API request failed: {str(e)}")
+        context.error(f"🔍 Error type: {type(e).__name__}")
+        raise
+    except Exception as e:
+        context.error(f"❌ Unexpected error: {str(e)}")
+        context.error(f"🔍 Error type: {type(e).__name__}")
         raise
 
 
