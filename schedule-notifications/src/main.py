@@ -7,6 +7,9 @@ import os
 import json
 from collections import defaultdict
 
+# Configuration - Prayer Time API
+PRAYER_TIME_API_BASE_URL = "https://api-aladhan-com-1k5h.onrender.com"
+
 
 def get_utc_times(timestamp_str, mins=0):
     """Convert local ISO 8601 time string to UTC and compute reminder time if needed."""
@@ -104,83 +107,33 @@ def delete_existing_notifications(databases, device_ids):
 
 
 def fetch_prayer_time(date_str, lat, lon, method, context):
-    """Fetch prayer timings from Aladhan API."""
-    url = f"https://api.aladhan.com/v1/timings/{date_str}?latitude={lat}&longitude={lon}&method={method}&iso8601=true"
-
-    # Enhanced URL logging
-    context.log("=" * 80)
-    context.log(f"🔗 FULL ALADHAN API URL: {url}")
-    context.log(f"📅 Date: {date_str}")
-    context.log(f"📍 Coordinates: {lat}, {lon}")
-    context.log(f"🕌 Method: {method}")
-    context.log("=" * 80)
-    context.log(f"⏱️ API call started at: {datetime.now(timezone.utc).isoformat()}")
-
-    try:
-        context.log("🚀 Starting requests.get() call...")
-        response = requests.get(url, timeout=30)  # Increased timeout to 30 seconds
-        context.log(
-            f"⏱️ API call completed at: {datetime.now(timezone.utc).isoformat()}"
-        )
-        context.log(f"📊 API response status: {response.status_code}")
-        context.log(f"📏 Response content length: {len(response.content)}")
-        context.log(f"📄 Response headers: {dict(response.headers)}")
-
-        # Log first 500 characters of response
-        response_text = response.text[:500]
-        context.log(f"📝 Response preview: {response_text}")
-
-        response.raise_for_status()
-        context.log("✅ API call successful")
-
-        # Try to parse JSON and log the structure
-        json_data = response.json()
-        context.log(f"📋 JSON keys: {list(json_data.keys())}")
-        if "data" in json_data and "timings" in json_data["data"]:
-            context.log(
-                f"🕌 Timings found: {list(json_data['data']['timings'].keys())}"
-            )
-            return json_data["data"]["timings"]
-        else:
-            context.error(f"❌ Unexpected JSON structure: {json_data}")
-            return {}
-
-    except requests.exceptions.Timeout:
-        context.error("⏰ API call timed out after 30 seconds")
-        context.error("🔍 This suggests the API is blocking or very slow")
-        raise
-    except requests.exceptions.RequestException as e:
-        context.error(f"🌐 API request failed: {str(e)}")
-        context.error(f"🔍 Error type: {type(e).__name__}")
-        raise
-    except Exception as e:
-        context.error(f"❌ Unexpected error: {str(e)}")
-        context.error(f"🔍 Error type: {type(e).__name__}")
-        raise
+    """Fetch prayer timings from Prayer Time API."""
+    url = f"{PRAYER_TIME_API_BASE_URL}/v1/timings/{date_str}?latitude={lat}&longitude={lon}&method={method}&iso8601=true"
+    response = requests.get(url)
+    response.raise_for_status()
+    return response.json()["data"]["timings"]
 
 
 def build_notifications_for_device(device, date_str, context):
     """Build notification payloads for a single device."""
-    device_id = device.get("device_id", "unknown")
-    context.log(f"🔨 Building notifications for device: {device_id}")
     notifications = []
 
     # Check for required fields before making API call
     required_fields = ["latitude", "longitude", "method"]
     for field in required_fields:
         if not device.get(field):
-            context.log(f"⚠️ Device {device_id} missing {field}, skipping")
+            context.log(
+                f"Device {device.get('device_id', 'unknown')} missing {field}, skipping"
+            )
             return notifications
 
-    context.log(f"🌐 Fetching prayer times for device {device_id}...")
     try:
         timings = fetch_prayer_time(
             date_str, device["latitude"], device["longitude"], device["method"], context
         )
-        context.log(f"✅ Successfully fetched prayer times for device {device_id}")
     except Exception as e:
         context.error(
-            f"❌ Failed to fetch prayer times for device {device_id}: {str(e)}"
+            f"Failed to fetch prayer times for device {device['device_id']}: {str(e)}"
         )
         return notifications  # Return empty list to skip
 
@@ -234,76 +187,29 @@ def build_notifications_for_device(device, date_str, context):
 
 
 def main(context):
-    # Quick test endpoint - DELETE THIS LATER
-    if context.req.path == "/test":
-        context.log("🧪 Test endpoint called - testing network connectivity")
+    # Health check - hit the API endpoint first
+    health_check_url = f"{PRAYER_TIME_API_BASE_URL}/v1/timings/18-09-2025?latitude=47.618962&longitude=-122.337647"
+    try:
+        health_response = requests.get(health_check_url, timeout=10)
+        health_response.raise_for_status()
+        context.log("✅ Health check passed - API is accessible")
+    except Exception as e:
+        context.log(f"⚠️ Health check failed: {str(e)}")
+        # Continue execution even if health check fails
 
-        try:
-            # Test 1: Simple HTTP request
-            context.log("🌐 Testing basic HTTP connectivity...")
-            response = requests.get("https://httpbin.org/get", timeout=10)
-            context.log(f"✅ Basic HTTP test: {response.status_code}")
-
-            # Test 2: MuslimSalat API test
-            context.log("🕌 Testing MuslimSalat API connectivity...")
-            test_url = "https://muslimsalat.com/london.json?key=5a90e396ea3b8ee1e8368485cf5f5894"
-            muslimsalat_response = requests.get(test_url, timeout=10)
-            context.log(f"✅ MuslimSalat API test: {muslimsalat_response.status_code}")
-
-            return context.res.json(
-                {
-                    "success": True,
-                    "message": "Network connectivity test successful!",
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
-                    "tests": {
-                        "basic_http": {
-                            "status": response.status_code,
-                            "url": "https://httpbin.org/get",
-                        },
-                        "muslimsalat_api": {
-                            "status": muslimsalat_response.status_code,
-                            "url": test_url,
-                            "raw_response": (
-                                muslimsalat_response.json()
-                                if muslimsalat_response.status_code == 200
-                                else None
-                            ),
-                        },
-                    },
-                }
-            )
-
-        except Exception as e:
-            context.error(f"❌ Network test failed: {str(e)}")
-            return context.res.json(
-                {
-                    "success": False,
-                    "message": "Network connectivity test failed",
-                    "error": str(e),
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
-                }
-            )
-
-    context.log("🚀 Starting schedule-notifications function")
     now = datetime.now(timezone.utc)
     date_str = now.strftime("%d-%m-%Y")
-    context.log(f"📅 Processing date: {date_str}")
 
-    context.log("🔧 Initializing Appwrite client...")
     client = init_appwrite_client(context)
     databases = Databases(client)
-    context.log("✅ Appwrite client initialized")
 
     try:
         # Check if specific device_id is provided
-        context.log("📥 Parsing request body...")
         request_data = context.req.body_json if context.req.body else {}
         target_device_id = request_data.get("device_id")
-        context.log(f"🎯 Target device ID: {target_device_id}")
 
         if target_device_id:
             # Process only the specified device
-            context.log(f"🔍 Fetching specific device: {target_device_id}")
             devices = databases.list_documents(
                 database_id="projectbilal",
                 collection_id="devices",
@@ -312,86 +218,56 @@ def main(context):
                     Query.equal("device_id", target_device_id),
                 ],
             )["documents"]
-            context.log(f"✅ Found {len(devices)} specific devices")
         else:
             # Process all devices (current behavior)
-            context.log("🔍 Fetching all enabled devices...")
             devices = fetch_enabled_devices(databases)
-            context.log(f"✅ Found {len(devices)} enabled devices")
 
-        context.log("🔍 Fetching enabled timings...")
         timings = fetch_enabled_timings(databases)
-        context.log(f"✅ Found {len(timings)} enabled timings")
+        context.log(f"Found {len(devices)} devices and {len(timings)} timings")
 
         # Group timings by device_id
-        context.log("📊 Grouping timings by device...")
         timings_by_device = group_timings_by_device(timings)
-        context.log(f"✅ Grouped timings for {len(timings_by_device)} devices")
 
         devices_with_timings = []
         all_notifications = []
 
-        context.log("🔄 Processing devices and building notifications...")
-        for i, device in enumerate(devices):
+        for device in devices:
             device_id = device.get("device_id")
-            context.log(f"📱 Processing device {i+1}/{len(devices)}: {device_id}")
-
             if not device_id:
-                context.log(f"⚠️ Device {i+1} has no device_id, skipping")
                 continue
 
             device_timings = timings_by_device.get(device_id, [])
-            context.log(f"📋 Device {device_id} has {len(device_timings)} timings")
-
             if not device_timings:
-                context.log(f"⚠️ Device {device_id} has no timings, skipping")
                 continue
 
-            context.log(f"🔨 Building device object for {device_id}...")
             device_obj = build_device_object(device, device_timings)
             devices_with_timings.append(device_obj)
 
-            context.log(f"🕐 Building notifications for device {device_id}...")
             notifications = build_notifications_for_device(
                 device_obj, date_str, context
             )
-            context.log(
-                f"✅ Device {device_id} generated {len(notifications)} notifications"
-            )
             all_notifications.extend(notifications)
 
-        context.log(f"📊 Total prepared notifications: {len(all_notifications)}")
+        context.log(f"Prepared {len(all_notifications)} notifications")
 
         if all_notifications:
             # Get unique device IDs from notifications
             device_ids = list(
                 set(notification["device_id"] for notification in all_notifications)
             )
-            context.log(
-                f"🗑️ Deleting existing notifications for {len(device_ids)} devices: {device_ids}"
-            )
 
             # Delete existing notifications for these devices
-            context.log("🗑️ Starting deletion of existing notifications...")
             delete_existing_notifications(databases, device_ids)
-            context.log("✅ Finished deleting existing notifications")
 
             try:
-                context.log(
-                    f"💾 Upserting {len(all_notifications)} notifications to database..."
-                )
                 databases.upsert_documents(
                     database_id="projectbilal",
                     collection_id="notifications",
                     documents=all_notifications,
                 )
-                context.log("✅ Successfully upserted notifications")
             except Exception as e:
-                context.error(f"❌ Failed to upsert notifications: {str(e)}")
-        else:
-            context.log("⚠️ No notifications to process")
+                context.error(f"Failed to upsert notifications: {str(e)}")
 
-        context.log("🎉 Function completed successfully")
         return context.res.json(
             {
                 "success": True,
