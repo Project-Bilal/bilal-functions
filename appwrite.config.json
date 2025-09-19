@@ -99,7 +99,7 @@
             "entrypoint": "src/main.py",
             "commands": "pip install -r requirements.txt",
             "specification": "s-1vcpu-512mb",
-            "path": "functions/prayer-times"
+            "path": "prayer-times"
         }
     ]
 }
