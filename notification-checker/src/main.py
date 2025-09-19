@@ -5,10 +5,24 @@ from appwrite.query import Query
 from appwrite.services.functions import Functions
 import os
 import json
+import requests
+
+# Configuration - Prayer Time API
+PRAYER_TIME_API_BASE_URL = "https://api-aladhan-com-1k5h.onrender.com"
 
 
 # This Appwrite function will be executed every time your function is triggered
 def main(context):
+    # Health check - hit the API endpoint first
+    health_check_url = f"{PRAYER_TIME_API_BASE_URL}/v1/timings/18-09-2025?latitude=47.618962&longitude=-122.337647"
+    try:
+        health_response = requests.get(health_check_url, timeout=10)
+        health_response.raise_for_status()
+        context.log("✅ Health check passed - API is accessible")
+    except Exception as e:
+        context.log(f"⚠️ Health check failed: {str(e)}")
+        # Continue execution even if health check fails
+
     current_time = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M")
 
     # Initialize Appwrite client
