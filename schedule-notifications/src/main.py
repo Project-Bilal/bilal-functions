@@ -108,7 +108,7 @@ def delete_existing_notifications(databases, device_ids):
 
 def fetch_prayer_time(date_str, lat, lon, method, context):
     """Fetch prayer timings from Prayer Time API."""
-    url = f"{PRAYER_TIME_API_BASE_URL}/v1/timings/{date_str}?latitude={lat}&longitude={lon}&method={method}&iso8601=true"
+    url = f"{PRAYER_TIME_API_BASE_URL}/v1/timings/{date_str}?latitude={lat}&longitude={lon}&method={method}&school={school}&iso8601=true"
     response = requests.get(url)
     response.raise_for_status()
     return response.json()["data"]["timings"]
