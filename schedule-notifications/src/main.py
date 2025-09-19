@@ -106,7 +106,7 @@ def delete_existing_notifications(databases, device_ids):
         print(f"Error deleting existing notifications: {str(e)}")
 
 
-def fetch_prayer_time(date_str, lat, lon, method, context):
+def fetch_prayer_time(date_str, lat, lon, method, school, context):
     """Fetch prayer timings from Prayer Time API."""
     url = f"{PRAYER_TIME_API_BASE_URL}/v1/timings/{date_str}?latitude={lat}&longitude={lon}&method={method}&school={school}&iso8601=true"
     response = requests.get(url)
@@ -129,7 +129,7 @@ def build_notifications_for_device(device, date_str, context):
 
     try:
         timings = fetch_prayer_time(
-            date_str, device["latitude"], device["longitude"], device["method"], context
+            date_str, device["latitude"], device["longitude"], device["method"], device["school"], context
         )
     except Exception as e:
         context.error(
