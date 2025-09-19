@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 import pytz
 import requests
 import time
-from praytime import PrayTime
+from .praytime import PrayTime
 import os
 import json
 
@@ -111,11 +111,11 @@ def calculate_prayer_times(
         raise e
 
 
-def main(req, res):
+def main(context):
     """Main Appwrite function handler"""
     try:
         # Parse query parameters from the request
-        query_params = req.get("query", {})
+        query_params = context.req.query if hasattr(context.req, "query") else {}
 
         # Extract parameters with defaults
         date = query_params.get("date")
@@ -134,7 +134,7 @@ def main(req, res):
         methodSettings = query_params.get("methodSettings")
         # Validate coordinates
         if not (-90 <= latitude <= 90):
-            return res.json(
+            return context.res.json(
                 {
                     "code": 400,
                     "status": "Bad Request",
@@ -143,7 +143,7 @@ def main(req, res):
                 400,
             )
         if not (-180 <= longitude <= 180):
-            return res.json(
+            return context.res.json(
                 {
                     "code": 400,
                     "status": "Bad Request",
@@ -167,7 +167,7 @@ def main(req, res):
                         int(year), int(month), int(day), tzinfo=timezone.utc
                     )
             except (ValueError, IndexError):
-                return res.json(
+                return context.res.json(
                     {
                         "code": 400,
                         "status": "Bad Request",
@@ -181,7 +181,7 @@ def main(req, res):
             try:
                 tz = pytz.timezone(timezonestring)
             except pytz.exceptions.UnknownTimeZoneError:
-                return res.json(
+                return context.res.json(
                     {
                         "code": 400,
                         "status": "Bad Request",
@@ -192,7 +192,7 @@ def main(req, res):
         else:
             # Get timezone from coordinates using Google API
             if not GOOGLE_API_KEY:
-                return res.json(
+                return context.res.json(
                     {
                         "code": 400,
                         "status": "Bad Request",
@@ -207,11 +207,11 @@ def main(req, res):
                 )
                 tz = pytz.timezone(timezone_id)
             except ValueError as e:
-                return res.json(
+                return context.res.json(
                     {"code": 400, "status": "Bad Request", "data": str(e)}, 400
                 )
             except pytz.exceptions.UnknownTimeZoneError:
-                return res.json(
+                return context.res.json(
                     {
                         "code": 400,
                         "status": "Bad Request",
@@ -233,7 +233,7 @@ def main(req, res):
                 iso8601,
             )
         except Exception as e:
-            return res.json(
+            return context.res.json(
                 {
                     "code": 500,
                     "status": "Internal Server Error",
@@ -293,10 +293,12 @@ def main(req, res):
         }
 
         # Return the response in the same format as FastAPI
-        return res.json({"timings": timings, "date": response_date, "meta": meta}, 200)
+        return context.res.json(
+            {"timings": timings, "date": response_date, "meta": meta}, 200
+        )
 
     except Exception as e:
-        return res.json(
+        return context.res.json(
             {
                 "code": 500,
                 "status": "Internal Server Error",
