@@ -129,7 +129,12 @@ def build_notifications_for_device(device, date_str, context):
 
     try:
         timings = fetch_prayer_time(
-            date_str, device["latitude"], device["longitude"], device["method"], device["school"], context
+            date_str,
+            device["latitude"],
+            device["longitude"],
+            device["method"],
+            device["school"],
+            context,
         )
     except Exception as e:
         context.error(
