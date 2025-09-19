@@ -1,96 +1,105 @@
 {
-  "projectId": "projectbilal",
-  "endpoint": "https://fra.cloud.appwrite.io/v1",
-  "functions": [
-    {
-      "$id": "invoke-notification",
-      "execute": [],
-      "name": "invoke-notification",
-      "enabled": true,
-      "logging": true,
-      "runtime": "python-3.12",
-      "scopes": [],
-      "events": [],
-      "schedule": "",
-      "timeout": 100,
-      "entrypoint": "src/main.py",
-      "commands": "pip install -r requirements.txt",
-      "specification": "s-0.5vcpu-512mb",
-      "path": "invoke-notification"
-    },
-    {
-      "$id": "notification-checker",
-      "execute": [],
-      "name": "notification-checker",
-      "enabled": true,
-      "logging": true,
-      "runtime": "python-3.12",
-      "scopes": ["documents.read", "execution.write"],
-      "events": [],
-      "schedule": "* * * * *",
-      "timeout": 100,
-      "entrypoint": "src/main.py",
-      "commands": "pip install -r requirements.txt",
-      "specification": "s-0.5vcpu-512mb",
-      "path": "notification-checker"
-    },
-    {
-      "$id": "schedule-notifications",
-      "execute": ["users"],
-      "name": "schedule-notifications",
-      "enabled": true,
-      "logging": true,
-      "runtime": "python-3.12",
-      "scopes": [
-        "rows.read",
-        "documents.read",
-        "rows.write",
-        "documents.write"
-      ],
-      "events": [],
-      "schedule": "0 9 * * *",
-      "timeout": 100,
-      "entrypoint": "src/main.py",
-      "commands": "pip install -r requirements.txt",
-      "specification": "s-0.5vcpu-512mb",
-      "path": "schedule-notifications"
-    },
-    {
-      "$id": "device-handler",
-      "execute": ["users"],
-      "name": "device-handler",
-      "enabled": true,
-      "logging": true,
-      "runtime": "python-3.12",
-      "scopes": [
-        "rows.read",
-        "documents.read",
-        "rows.write",
-        "documents.write"
-      ],
-      "events": [],
-      "schedule": "",
-      "timeout": 60,
-      "entrypoint": "src/main.py",
-      "commands": "pip install -r requirements.txt",
-      "specification": "s-0.5vcpu-512mb",
-      "path": "functions/device-handler"
-    },
-    {
-      "$id": "prayer-times",
-      "execute": ["any"],
-      "name": "prayer-times",
-      "enabled": true,
-      "logging": true,
-      "runtime": "python-3.12",
-      "scopes": [],
-      "events": [],
-      "schedule": "",
-      "timeout": 100,
-      "entrypoint": "src/main.py",
-      "commands": "pip install -r requirements.txt",
-      "specification": "s-1vcpu-512mb",
-      "path": "prayer-times"
-    }
-  ]
+    "projectId": "projectbilal",
+    "endpoint": "https://fra.cloud.appwrite.io/v1",
+    "functions": [
+        {
+            "$id": "invoke-notification",
+            "execute": [],
+            "name": "invoke-notification",
+            "enabled": true,
+            "logging": true,
+            "runtime": "python-3.12",
+            "scopes": [],
+            "events": [],
+            "schedule": "",
+            "timeout": 100,
+            "entrypoint": "src/main.py",
+            "commands": "pip install -r requirements.txt",
+            "specification": "s-0.5vcpu-512mb",
+            "path": "invoke-notification"
+        },
+        {
+            "$id": "notification-checker",
+            "execute": [],
+            "name": "notification-checker",
+            "enabled": true,
+            "logging": true,
+            "runtime": "python-3.12",
+            "scopes": [
+                "documents.read",
+                "execution.write"
+            ],
+            "events": [],
+            "schedule": "* * * * *",
+            "timeout": 100,
+            "entrypoint": "src/main.py",
+            "commands": "pip install -r requirements.txt",
+            "specification": "s-0.5vcpu-512mb",
+            "path": "notification-checker"
+        },
+        {
+            "$id": "schedule-notifications",
+            "execute": [
+                "users"
+            ],
+            "name": "schedule-notifications",
+            "enabled": true,
+            "logging": true,
+            "runtime": "python-3.12",
+            "scopes": [
+                "rows.read",
+                "documents.read",
+                "rows.write",
+                "documents.write"
+            ],
+            "events": [],
+            "schedule": "0 9 * * *",
+            "timeout": 100,
+            "entrypoint": "src/main.py",
+            "commands": "pip install -r requirements.txt",
+            "specification": "s-0.5vcpu-512mb",
+            "path": "schedule-notifications"
+        },
+        {
+            "$id": "device-handler",
+            "execute": [
+                "users"
+            ],
+            "name": "device-handler",
+            "enabled": true,
+            "logging": true,
+            "runtime": "python-3.12",
+            "scopes": [
+                "rows.read",
+                "documents.read",
+                "rows.write",
+                "documents.write"
+            ],
+            "events": [],
+            "schedule": "",
+            "timeout": 60,
+            "entrypoint": "src/main.py",
+            "commands": "pip install -r requirements.txt",
+            "specification": "s-0.5vcpu-512mb",
+            "path": "functions/device-handler"
+        },
+        {
+            "$id": "prayer-times",
+            "execute": [
+                "any"
+            ],
+            "name": "prayer-times",
+            "enabled": true,
+            "logging": true,
+            "runtime": "python-3.12",
+            "scopes": [],
+            "events": [],
+            "schedule": "",
+            "timeout": 100,
+            "entrypoint": "src/main.py",
+            "commands": "pip install -r requirements.txt",
+            "specification": "s-1vcpu-512mb",
+            "path": "prayer-times"
+        }
+    ]
 }

@@ -70,15 +70,32 @@ class PrayTime:
     def method(self, method: Union[str, int]) -> "PrayTime":
         """Set calculation method by name or numeric ID"""
         # Convert numeric ID to method name if needed
+        print(f"Debug: method() - Input method: {method} (type: {type(method)})")
+
+        # Handle both string and integer method IDs
+        if isinstance(method, str) and method.isdigit():
+            method = int(method)
+            print(f"Debug: method() - Converted string to integer: {method}")
+
         if isinstance(method, int):
+            print(f"Debug: method() - Converting integer method {method}")
             if method in self.method_ids:
                 method = self.method_ids[method]
+                print(f"Debug: method() - Converted to: {method}")
             else:
                 raise ValueError(f"Invalid method ID: {method}")
 
+        print(f"Debug: method() - Setting method to: {method}")
+        print(f"Debug: method() - Before defaults: {self.settings}")
+
         self.settings.update(self.methods["defaults"])
+        print(f"Debug: method() - After defaults: {self.settings}")
+
         if method in self.methods:
+            print(f"Debug: method() - Method config: {self.methods[method]}")
             self.settings.update(self.methods[method])
+            print(f"Debug: method() - After method update: {self.settings}")
+
         return self
 
     def adjust(self, params: Dict[str, Any]) -> "PrayTime":
@@ -184,6 +201,10 @@ class PrayTime:
         params = self.settings
         horizon = 0.833
 
+        print(f"Debug: processTimes - params keys: {list(params.keys())}")
+        print(f"Debug: processTimes - params: {params}")
+        print(f"Debug: processTimes - times keys: {list(times.keys())}")
+
         return {
             "fajr": self.angleTime(params["fajr"], times["fajr"], -1),
             "sunrise": self.angleTime(horizon, times["sunrise"], -1),
@@ -245,8 +266,15 @@ class PrayTime:
 
     def sunPosition(self, time: float) -> Dict[str, float]:
         """Compute sun position"""
+        print(f"Debug: sunPosition - time: {time} (type: {type(time)})")
         lng = self.settings["location"][1]
+        print(f"Debug: sunPosition - lng: {lng} (type: {type(lng)})")
+        print(
+            f"Debug: sunPosition - self.utcTime: {self.utcTime} (type: {type(self.utcTime)})"
+        )
+
         D = self.utcTime / 86400000 - 10957.5 + self.value(time) / 24 - lng / 360
+        print(f"Debug: sunPosition - D: {D}")
 
         g = self.mod(357.529 + 0.98560028 * D, 360)
         q = self.mod(280.459 + 0.98564736 * D, 360)
@@ -269,9 +297,11 @@ class PrayTime:
         self, angle: Union[float, str], time: float, direction: int = 1
     ) -> float:
         """Compute the time when sun reaches a specific angle below horizon"""
+        print(f"Debug: angleTime - angle: {angle} (type: {type(angle)}), time: {time}")
         lat = self.settings["location"][0]
         decl = self.sunPosition(time)["declination"]
         angle_val = self.value(angle)
+        print(f"Debug: angleTime - angle_val: {angle_val} (type: {type(angle_val)})")
         numerator = -self.sin(angle_val) - self.sin(lat) * self.sin(decl)
         denominator = self.cos(lat) * self.cos(decl)
 
