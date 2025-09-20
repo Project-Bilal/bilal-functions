@@ -290,6 +290,10 @@ def build_notifications_for_device(device, date_str, context):
             )
             return notifications
 
+    # Parse the date string once per device (DD-MM-YYYY format)
+    day, month, year = date_str.split("-")
+    target_date = datetime(int(year), int(month), int(day)).date()
+
     try:
         timings, timezone_id = fetch_prayer_time(
             date_str,
@@ -313,10 +317,6 @@ def build_notifications_for_device(device, date_str, context):
         time_str = timings.get(prayer_name)
         reminder = int(timing.get("reminder") or 0)
 
-        # Parse the date string (DD-MM-YYYY format) for UTC conversion
-        day, month, year = date_str.split("-")
-        target_date = datetime(int(year), int(month), int(day)).date()
-
         utc_time, utc_time_rem = get_utc_times(
             time_str, reminder, target_date, prayer_name
         )
@@ -330,18 +330,26 @@ def build_notifications_for_device(device, date_str, context):
         local_time = convert_utc_to_local(utc_time, timezone_id)
         local_time_rem = convert_utc_to_local(utc_time_rem, timezone_id)
 
+        # Pre-format common fields to avoid repetition
+        device_id = device["device_id"]
+        ip_address = device.get("ip_address")
+        port = device.get("port")
+        volume = timing["volume"]
+        user_id = timing["user_id"]
+        timing_id = timing["timing_id"]
+
         # Main notification
         notifications.append(
             {
-                "device_id": device["device_id"],
+                "device_id": device_id,
                 "timestampUTC": utc_time,
                 "timestampLocal": local_time,
-                "ip_address": device.get("ip_address"),
-                "port": device.get("port"),
+                "ip_address": ip_address,
+                "port": port,
                 "audio_id": timing["audio_id"],
-                "volume": timing["volume"],
-                "user_id": timing["user_id"],
-                "timing_id": timing["timing_id"],
+                "volume": volume,
+                "user_id": user_id,
+                "timing_id": timing_id,
                 "type": "notification",
                 "enabled": True,
             }
@@ -350,15 +358,15 @@ def build_notifications_for_device(device, date_str, context):
         # Reminder notification - always create, but set enabled based on reminder_enabled
         notifications.append(
             {
-                "device_id": device["device_id"],
+                "device_id": device_id,
                 "timestampUTC": utc_time_rem,
                 "timestampLocal": local_time_rem,
-                "ip_address": device.get("ip_address"),
-                "port": device.get("port"),
+                "ip_address": ip_address,
+                "port": port,
                 "audio_id": timing["reminder_audio_id"],
-                "volume": timing["volume"],
-                "user_id": timing["user_id"],
-                "timing_id": timing["timing_id"],
+                "volume": volume,
+                "user_id": user_id,
+                "timing_id": timing_id,
                 "type": "reminder",
                 "enabled": timing.get("reminder_enabled", True),
             }

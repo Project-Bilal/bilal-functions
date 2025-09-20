@@ -38,6 +38,9 @@ class PrayTime:
             12: "France",
             14: "Russia",
         }
+        
+        # Cache for method lookups
+        self._method_cache = {}
 
         self.settings = {
             "dhuhr": "0 min",
@@ -69,15 +72,23 @@ class PrayTime:
 
     def method(self, method: Union[str, int]) -> "PrayTime":
         """Set calculation method by name or numeric ID"""
-        # Handle both string and integer method IDs
-        if isinstance(method, str) and method.isdigit():
-            method = int(method)
+        # Check cache first
+        cache_key = str(method)
+        if cache_key in self._method_cache:
+            method = self._method_cache[cache_key]
+        else:
+            # Handle both string and integer method IDs
+            if isinstance(method, str) and method.isdigit():
+                method = int(method)
 
-        if isinstance(method, int):
-            if method in self.method_ids:
-                method = self.method_ids[method]
-            else:
-                raise ValueError(f"Invalid method ID: {method}")
+            if isinstance(method, int):
+                if method in self.method_ids:
+                    method = self.method_ids[method]
+                else:
+                    raise ValueError(f"Invalid method ID: {method}")
+            
+            # Cache the result
+            self._method_cache[cache_key] = method
 
         self.settings.update(self.methods["defaults"])
 
