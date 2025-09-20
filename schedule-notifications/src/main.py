@@ -107,16 +107,6 @@ def fetch_enabled_devices(databases):
     )["documents"]
 
 
-def fetch_enabled_timings(databases):
-    """Fetch all enabled timings (for all devices)."""
-    result = databases.list_documents(
-        database_id="projectbilal",
-        collection_id="timings",
-        queries=[Query.equal("enabled", True)],
-    )
-    return result["documents"]
-
-
 def group_timings_by_device(timings):
     """Group timing documents by device_id."""
     grouped = defaultdict(list)
@@ -337,6 +327,7 @@ def build_notifications_for_device(device, date_str, context):
         volume = timing["volume"]
         user_id = timing["user_id"]
         timing_id = timing["timing_id"]
+        timing_enabled = timing.get("enabled", True)  # Get timing enabled status
 
         # Main notification
         notifications.append(
@@ -351,11 +342,12 @@ def build_notifications_for_device(device, date_str, context):
                 "user_id": user_id,
                 "timing_id": timing_id,
                 "type": "notification",
-                "enabled": True,
+                "enabled": timing_enabled,  # Use timing enabled status
             }
         )
 
-        # Reminder notification - always create, but set enabled based on reminder_enabled
+        # Reminder notification - always create, but set enabled based on timing enabled AND reminder_enabled
+        reminder_enabled = timing_enabled and timing.get("reminder_enabled", True)
         notifications.append(
             {
                 "device_id": device_id,
@@ -368,7 +360,7 @@ def build_notifications_for_device(device, date_str, context):
                 "user_id": user_id,
                 "timing_id": timing_id,
                 "type": "reminder",
-                "enabled": timing.get("reminder_enabled", True),
+                "enabled": reminder_enabled,  # Both timing and reminder must be enabled
             }
         )
 
@@ -398,19 +390,22 @@ def main(context):
                 ],
             )["documents"]
 
-            # Fetch only timings for this specific device
+            # Fetch all timings for this specific device (enabled and disabled)
             timings = databases.list_documents(
                 database_id="projectbilal",
                 collection_id="timings",
                 queries=[
-                    Query.equal("enabled", True),
                     Query.equal("device_id", target_device_id),
                 ],
             )["documents"]
         else:
             # Process all devices (current behavior)
             devices = fetch_enabled_devices(databases)
-            timings = fetch_enabled_timings(databases)
+            # Fetch all timings (enabled and disabled)
+            timings = databases.list_documents(
+                database_id="projectbilal",
+                collection_id="timings",
+            )["documents"]
         context.log(f"Found {len(devices)} devices and {len(timings)} timings")
 
         # Group timings by device_id
