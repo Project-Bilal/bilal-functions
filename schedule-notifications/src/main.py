@@ -327,7 +327,7 @@ def build_notifications_for_device(device, date_str, context):
         volume = timing["volume"]
         user_id = timing["user_id"]
         timing_id = timing["timing_id"]
-        timing_enabled = timing.get("enabled", True)  # Get timing enabled status
+        timing_enabled = timing.get("enabled", False)  # Get timing enabled status, default to False
 
         # Main notification
         notifications.append(
