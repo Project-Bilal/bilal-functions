@@ -38,7 +38,7 @@ class PrayTime:
             12: "France",
             14: "Russia",
         }
-        
+
         # Cache for method lookups
         self._method_cache = {}
 
@@ -86,7 +86,7 @@ class PrayTime:
                     method = self.method_ids[method]
                 else:
                     raise ValueError(f"Invalid method ID: {method}")
-            
+
             # Cache the result
             self._method_cache[cache_key] = method
 

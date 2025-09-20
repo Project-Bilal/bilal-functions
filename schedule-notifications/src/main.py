@@ -397,11 +397,20 @@ def main(context):
                     Query.equal("device_id", target_device_id),
                 ],
             )["documents"]
+
+            # Fetch only timings for this specific device
+            timings = databases.list_documents(
+                database_id="projectbilal",
+                collection_id="timings",
+                queries=[
+                    Query.equal("enabled", True),
+                    Query.equal("device_id", target_device_id),
+                ],
+            )["documents"]
         else:
             # Process all devices (current behavior)
             devices = fetch_enabled_devices(databases)
-
-        timings = fetch_enabled_timings(databases)
+            timings = fetch_enabled_timings(databases)
         context.log(f"Found {len(devices)} devices and {len(timings)} timings")
 
         # Group timings by device_id
