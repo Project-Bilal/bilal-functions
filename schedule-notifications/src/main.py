@@ -133,10 +133,11 @@ def build_device_object(device, timings):
                 "timing_id": t.get("$id"),  # Include the timing document ID
                 "notification": t.get("notification"),
                 "audio_id": t.get("audio_id"),
+                "enabled": t.get("enabled", False),  # Include enabled field
                 "reminder": t.get("reminder"),
                 "reminder_audio_id": t.get("reminder_audio_id"),
                 "reminder_enabled": t.get(
-                    "reminder_enabled", True
+                    "reminder_enabled", False
                 ),  # Include reminder_enabled field
                 "volume": t.get("volume"),
                 "user_id": t.get("user_id"),
@@ -329,7 +330,6 @@ def build_notifications_for_device(device, date_str, context):
         timing_id = timing["timing_id"]
         # Get timing enabled status - null/None should be treated as False
         timing_enabled = timing.get("enabled", False)
-        context.log(f"Timing {timing_id}: enabled={timing.get('enabled')}, timing_enabled={timing_enabled}")
 
         # Main notification
         notifications.append(
@@ -350,7 +350,6 @@ def build_notifications_for_device(device, date_str, context):
 
         # Reminder notification - always create, but set enabled based on timing enabled AND reminder_enabled
         reminder_enabled = timing_enabled and timing.get("reminder_enabled", False)
-        context.log(f"Timing {timing_id}: reminder_enabled={timing.get('reminder_enabled')}, final_reminder_enabled={reminder_enabled}")
         notifications.append(
             {
                 "device_id": device_id,
