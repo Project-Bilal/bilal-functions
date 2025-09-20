@@ -327,8 +327,8 @@ def build_notifications_for_device(device, date_str, context):
         volume = timing["volume"]
         user_id = timing["user_id"]
         timing_id = timing["timing_id"]
-        # Get timing enabled status - if field doesn't exist, assume True (for backward compatibility)
-        timing_enabled = timing.get("enabled") if "enabled" in timing else True
+        # Get timing enabled status - null/None should be treated as False
+        timing_enabled = timing.get("enabled", False)
 
         # Main notification
         notifications.append(
@@ -348,7 +348,7 @@ def build_notifications_for_device(device, date_str, context):
         )
 
         # Reminder notification - always create, but set enabled based on timing enabled AND reminder_enabled
-        reminder_enabled = timing_enabled and timing.get("reminder_enabled", True)
+        reminder_enabled = timing_enabled and timing.get("reminder_enabled", False)
         notifications.append(
             {
                 "device_id": device_id,
