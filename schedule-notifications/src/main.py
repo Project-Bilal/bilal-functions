@@ -2,40 +2,72 @@ from appwrite.client import Client
 from appwrite.services.databases import Databases
 from appwrite.query import Query
 from datetime import datetime, timezone, timedelta
-import requests
 import os
 import json
+import requests
 import time
 import pytz
 from collections import defaultdict
 from typing import Dict, Any
 from .praytime import PrayTime
 
-# Configuration for local prayer calculation
+# Configuration for prayer calculation
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 GOOGLE_TIMEZONE_BASE_URL = "https://maps.googleapis.com/maps/api/timezone/json"
 
 
-def get_utc_times(timestamp_str, mins=0, target_date=None, timezone_str=None):
-    """Convert local time string to UTC and compute reminder time if needed."""
+def get_timezone_from_coordinates(
+    latitude: float, longitude: float, api_key: str
+) -> str:
+    """Get timezone from coordinates using Google Timezone API"""
+    if not api_key:
+        raise ValueError("Google API key is required for timezone lookup")
+
+    try:
+        timestamp = int(time.time())
+        url = f"{GOOGLE_TIMEZONE_BASE_URL}?location={latitude},{longitude}&timestamp={timestamp}&key={api_key}"
+
+        response = requests.get(url, timeout=10)
+        data = response.json()
+
+        if data.get("status") == "OK" and "timeZoneId" in data:
+            return data["timeZoneId"]
+        else:
+            raise ValueError(
+                f"Google Timezone API error: {data.get('error_message', 'Unknown error')}"
+            )
+    except Exception as e:
+        raise ValueError(f"Failed to get timezone: {str(e)}")
+
+
+def get_utc_times(timestamp_str, mins=0, target_date=None, prayer_name=None):
+    """Convert UTC time string to UTC and compute reminder time if needed."""
     # Handle both ISO 8601 format and simple time format (HH:MM)
     if "T" in timestamp_str:
         # ISO 8601 format
-        local_time = datetime.fromisoformat(timestamp_str)
+        utc_time = datetime.fromisoformat(timestamp_str)
     else:
-        # Simple time format (HH:MM) - use the target date and timezone
-        if not target_date or not timezone_str:
-            raise ValueError("target_date and timezone_str are required for simple time format")
-        
+        # Simple time format (HH:MM) - assume UTC
+        if not target_date:
+            raise ValueError("target_date is required for simple time format")
+
         time_parts = timestamp_str.split(":")
         hour = int(time_parts[0])
         minute = int(time_parts[1])
-        
-        # Create datetime in the target timezone
-        tz = pytz.timezone(timezone_str)
-        local_time = tz.localize(datetime.combine(target_date, datetime.min.time().replace(hour=hour, minute=minute)))
 
-    utc_time = local_time.astimezone(timezone.utc)
+        # Create datetime in UTC
+        utc_time = datetime.combine(
+            target_date, datetime.min.time().replace(hour=hour, minute=minute)
+        ).replace(tzinfo=timezone.utc)
+
+        # Check if this is a night prayer that should be on the next day in UTC
+        # Night prayers (Maghrib, Isha) typically occur after sunset
+        # If the time is before 12:00 UTC, it might be a night prayer from the previous day
+        if prayer_name and prayer_name.lower() in ["maghrib", "isha"] and hour < 12:
+            # This is a night prayer that crosses midnight in UTC
+            # Add one day to the date
+            utc_time = utc_time + timedelta(days=1)
+
     main_time = utc_time.strftime("%Y-%m-%dT%H:%M")
     reminder_time = (
         (utc_time - timedelta(minutes=mins)).strftime("%Y-%m-%dT%H:%M")
@@ -43,6 +75,18 @@ def get_utc_times(timestamp_str, mins=0, target_date=None, timezone_str=None):
         else None
     )
     return main_time, reminder_time
+
+
+def convert_utc_to_local(utc_time_str, timezone_str):
+    """Convert UTC time string to local timezone"""
+    # Parse UTC time
+    utc_time = datetime.fromisoformat(utc_time_str + ":00+00:00")
+
+    # Convert to local timezone
+    local_tz = pytz.timezone(timezone_str)
+    local_time = utc_time.astimezone(local_tz)
+
+    return local_time.strftime("%Y-%m-%dT%H:%M")
 
 
 def init_appwrite_client(context):
@@ -122,72 +166,33 @@ def delete_existing_notifications(databases, device_ids):
                 collection_id="notifications",
                 queries=[Query.equal("device_id", device_id)],
             )
-        print(f"Deleted existing notifications for {len(device_ids)} devices")
     except Exception as e:
-        print(f"Error deleting existing notifications: {str(e)}")
-
-
-def get_timezone_from_coordinates(
-    latitude: float, longitude: float, api_key: str
-) -> str:
-    """Get timezone from coordinates using Google Timezone API"""
-    if not api_key:
-        raise ValueError("Google API key is required for timezone lookup")
-
-    try:
-        timestamp = int(time.time())
-        url = f"{GOOGLE_TIMEZONE_BASE_URL}?location={latitude},{longitude}&timestamp={timestamp}&key={api_key}"
-
-        response = requests.get(url, timeout=10)
-        data = response.json()
-
-        if data.get("status") == "OK" and "timeZoneId" in data:
-            return data["timeZoneId"]
-        else:
-            raise ValueError(
-                f"Google Timezone API error: {data.get('error_message', 'Unknown error')}"
-            )
-    except Exception as e:
-        raise ValueError(f"Failed to get timezone: {str(e)}")
+        pass  # Silently continue if deletion fails
 
 
 def calculate_prayer_times(
     date: datetime,
     latitude: float,
     longitude: float,
-    timezone_str: str,
     method: int = 2,
     school: int = 0,
     adjustment: int = 0,
-    iso8601: bool = False,
 ) -> Dict[str, str]:
-    """Calculate prayer times using our custom Python calculator"""
+    """Calculate prayer times using our custom Python calculator in UTC"""
     try:
-        print(
-            f"Debug: Starting prayer calculation with method={method}, school={school}"
-        )
-
         # Create PrayTime instance with numeric method ID
         pt = PrayTime(method)
-        print(f"Debug: Created PrayTime instance")
 
         # Set location - ensure they are floats
         lat_float = float(latitude)
         lng_float = float(longitude)
         pt.location([lat_float, lng_float])
-        print(f"Debug: Set location to [{lat_float}, {lng_float}]")
-
-        # Set timezone
-        pt.timezone(timezone_str)
-        print(f"Debug: Set timezone to {timezone_str}")
 
         # Set school (0 = Shafi, 1 = Hanafi)
         if school == 1:
             pt.adjust({"asr": "Hanafi"})
-            print("Debug: Set school to Hanafi")
         else:
             pt.adjust({"asr": "Standard"})
-            print("Debug: Set school to Shafi")
 
         # Apply adjustments if provided
         if adjustment != 0:
@@ -199,7 +204,6 @@ def calculate_prayer_times(
                 "isha": adjustment,
             }
             pt.tune(adjustments)
-            print(f"Debug: Applied adjustments: {adjustments}")
 
         # Get prayer times for the specific date
         # Convert to naive datetime for the calculator
@@ -208,17 +212,8 @@ def calculate_prayer_times(
         else:
             naive_date = date
         date_list = [naive_date.year, naive_date.month, naive_date.day]
-        print(f"Debug: Calculating times for date: {date_list}")
 
-        try:
-            times = pt.times(date_list)
-            print(f"Debug: Got times from PrayTime: {times}")
-        except Exception as e:
-            print(f"Debug: Error in pt.times(): {type(e).__name__}: {str(e)}")
-            raise e
-
-        # Debug: Log what times are returned
-        print(f"Debug: Raw times from PrayTime: {times}")
+        times = pt.times(date_list)
 
         # Convert to the expected format - PrayTime returns lowercase keys
         formatted_times = {}
@@ -240,7 +235,6 @@ def calculate_prayer_times(
                 # If key not in mapping, use it as-is (capitalize first letter)
                 formatted_times[key.capitalize()] = value
 
-        print(f"Debug: Formatted times: {formatted_times}")
         return formatted_times
 
     except Exception as e:
@@ -249,17 +243,16 @@ def calculate_prayer_times(
 
 
 def fetch_prayer_time(date_str, lat, lon, method, school, context):
-    """Calculate prayer timings using local calculation only."""
+    """Calculate prayer timings using UTC calculation and get timezone."""
     try:
         # Parse the date string (DD-MM-YYYY format)
         day, month, year = date_str.split("-")
         target_date = datetime(int(year), int(month), int(day), tzinfo=timezone.utc)
 
-        # Determine timezone
+        # Get timezone for the coordinates
         if GOOGLE_API_KEY:
             try:
                 timezone_id = get_timezone_from_coordinates(lat, lon, GOOGLE_API_KEY)
-                tz = pytz.timezone(timezone_id)
             except Exception as e:
                 context.error(f"Failed to get timezone from coordinates: {str(e)}")
                 raise ValueError(f"Unable to determine timezone: {str(e)}")
@@ -267,16 +260,14 @@ def fetch_prayer_time(date_str, lat, lon, method, school, context):
             context.error("Google API key is required for timezone lookup")
             raise ValueError("Google API key is required for timezone lookup")
 
-        # Calculate prayer times using local calculation
+        # Calculate prayer times using UTC calculation
         timings = calculate_prayer_times(
             target_date,
             lat,
             lon,
-            str(tz),
             method,
             school,
             0,  # no adjustment
-            True,  # iso8601 format
         )
 
         return timings, timezone_id
@@ -316,32 +307,35 @@ def build_notifications_for_device(device, date_str, context):
 
     for timing in device["timings"]:
         prayer_name = timing.get("notification")
-        print(
-            f"Debug: Looking for prayer '{prayer_name}' in timings: {list(timings.keys())}"
-        )
         if not prayer_name or prayer_name not in timings:
-            print(f"Debug: Prayer '{prayer_name}' not found in timings, skipping")
             continue
 
         time_str = timings.get(prayer_name)
         reminder = int(timing.get("reminder") or 0)
-        
-        # Parse the date string (DD-MM-YYYY format) for timezone conversion
+
+        # Parse the date string (DD-MM-YYYY format) for UTC conversion
         day, month, year = date_str.split("-")
         target_date = datetime(int(year), int(month), int(day)).date()
-        
-        utc_time, utc_time_rem = get_utc_times(time_str, reminder, target_date, timezone_id)
+
+        utc_time, utc_time_rem = get_utc_times(
+            time_str, reminder, target_date, prayer_name
+        )
 
         # Always calculate reminder time, even if reminder is 0
         # If reminder is 0, utc_time_rem will be the same as utc_time
         if reminder == 0:
             utc_time_rem = utc_time
 
+        # Convert UTC times to local times
+        local_time = convert_utc_to_local(utc_time, timezone_id)
+        local_time_rem = convert_utc_to_local(utc_time_rem, timezone_id)
+
         # Main notification
         notifications.append(
             {
                 "device_id": device["device_id"],
                 "timestampUTC": utc_time,
+                "timestampLocal": local_time,
                 "ip_address": device.get("ip_address"),
                 "port": device.get("port"),
                 "audio_id": timing["audio_id"],
@@ -358,6 +352,7 @@ def build_notifications_for_device(device, date_str, context):
             {
                 "device_id": device["device_id"],
                 "timestampUTC": utc_time_rem,
+                "timestampLocal": local_time_rem,
                 "ip_address": device.get("ip_address"),
                 "port": device.get("port"),
                 "audio_id": timing["reminder_audio_id"],
