@@ -108,19 +108,30 @@ def main(context):
         )
 
         if notifications["total"] > 0:
-            functions = Functions(client)
             processed_count = 0
             notification_start = time.time()
             context.log(
-                f"🔄 Starting to process {len(notifications['documents'])} notifications..."
+                f"🔄 Starting to process {len(notifications['documents'])} notifications with single MQTT connection..."
             )
 
+            # Prepare all valid notifications first
+            valid_notifications = []
             for i, notification in enumerate(notifications["documents"]):
-                notification_item_start = time.time()
                 # Skip disabled notifications (safety check)
                 if not notification.get("enabled", True):
                     context.log(
                         f"Skipping disabled notification: {notification['$id']}"
+                    )
+                    continue
+
+                # Validate IP address and port before proceeding
+                if (
+                    not notification.get("ip_address")
+                    or notification.get("ip_address") == "0.0.0.0"
+                    or not notification.get("port")
+                ):
+                    context.log(
+                        f"⚠️ Skipping notification {notification['$id']} - invalid IP/port (IP: {notification.get('ip_address')}, Port: {notification.get('port')})"
                     )
                     continue
 
@@ -133,60 +144,103 @@ def main(context):
                     "audio_id": notification["audio_id"],
                     "volume": notification["volume"],
                 }
+                valid_notifications.append(
+                    (i + 1, notification["$id"], notification_data)
+                )
 
-                # Send notification to device via MQTT
+            if not valid_notifications:
+                context.log("ℹ️ No valid notifications to send after filtering")
+            else:
+                # Send all notifications using single MQTT connection
+                mqtt_start = time.time()
+                context.log(
+                    f"📤 Sending {len(valid_notifications)} notifications via single MQTT connection..."
+                )
+
                 try:
-                    mqtt_start = time.time()
-                    context.log(
-                        f"📤 Sending MQTT message for notification {i+1}/{len(notifications['documents'])}: {notification['$id']}"
+                    # Create single MQTT client
+                    mqtt_client = mqtt.Client(
+                        client_id=f"bilal_checker_batch_{int(time.time())}"
                     )
 
-                    # Validate IP address and port before proceeding
-                    if (
-                        not notification_data.get("ip_address")
-                        or notification_data.get("ip_address") == "0.0.0.0"
-                        or not notification_data.get("port")
-                    ):
-                        context.log(
-                            f"⚠️ Skipping notification {notification['$id']} - invalid IP/port (IP: {notification_data.get('ip_address')}, Port: {notification_data.get('port')})"
+                    # Set up callbacks
+                    connected_event = threading.Event()
+                    connection_error = None
+
+                    def on_connect(client, userdata, flags, rc):
+                        if rc == 0:
+                            connected_event.set()
+                        else:
+                            nonlocal connection_error
+                            connection_error = f"Connection failed with code {rc}"
+                            connected_event.set()
+
+                    def on_disconnect(client, userdata, rc):
+                        pass
+
+                    mqtt_client.on_connect = on_connect
+                    mqtt_client.on_disconnect = on_disconnect
+
+                    # Connect to MQTT broker
+                    mqtt_client.connect("broker.hivemq.com", 1883, 60)
+                    mqtt_client.loop_start()
+
+                    # Wait for connection
+                    if not connected_event.wait(timeout=10):
+                        raise Exception(
+                            "Failed to connect to MQTT broker within 10 seconds"
                         )
-                        continue
 
-                    # Create the MQTT message
-                    message_obj = {
-                        "action": "play",
-                        "props": {
-                            "volume": notification_data["volume"],
-                            "url": notification_data["audio_id"],
-                            "ip": notification_data["ip_address"],
-                            "port": int(notification_data["port"]),
-                        },
-                    }
+                    if connection_error:
+                        raise Exception(connection_error)
 
-                    # Convert to JSON string
-                    message = json.dumps(message_obj)
-                    topic = f"projectbilal/{notification_data['device_id']}"
+                    context.log("✅ Connected to MQTT broker, sending notifications...")
 
-                    # Send MQTT message
-                    success, result_message = send_mqtt_message(topic, message)
+                    # Send all notifications
+                    for i, notification_id, notification_data in valid_notifications:
+                        try:
+                            # Create the MQTT message
+                            message_obj = {
+                                "action": "play",
+                                "props": {
+                                    "volume": notification_data["volume"],
+                                    "url": notification_data["audio_id"],
+                                    "ip": notification_data["ip_address"],
+                                    "port": int(notification_data["port"]),
+                                },
+                            }
 
-                    if success:
-                        mqtt_time = time.time() - mqtt_start
-                        total_time = time.time() - notification_item_start
-                        context.log(
-                            f"✅ Notification {i+1} sent via MQTT in {mqtt_time:.3f}s (total: {total_time:.3f}s)"
-                        )
-                        processed_count += 1
-                    else:
-                        mqtt_time = time.time() - mqtt_start
-                        context.error(
-                            f"❌ MQTT send failed for notification {notification['$id']} after {mqtt_time:.3f}s: {result_message}"
-                        )
+                            # Convert to JSON string
+                            message = json.dumps(message_obj)
+                            topic = f"projectbilal/{notification_data['device_id']}"
+
+                            # Publish message
+                            result = mqtt_client.publish(topic, message, qos=1)
+                            result.wait_for_publish()
+
+                            context.log(
+                                f"✅ Notification {i}/{len(valid_notifications)} sent: {notification_id}"
+                            )
+                            processed_count += 1
+
+                        except Exception as e:
+                            context.error(
+                                f"❌ Failed to send notification {notification_id}: {str(e)}"
+                            )
+
+                    # Disconnect
+                    mqtt_client.loop_stop()
+                    mqtt_client.disconnect()
+
+                    mqtt_time = time.time() - mqtt_start
+                    context.log(
+                        f"🏁 All {processed_count} notifications sent via MQTT in {mqtt_time:.3f}s"
+                    )
 
                 except Exception as e:
                     mqtt_time = time.time() - mqtt_start
                     context.error(
-                        f"❌ Failed to send notification {notification['$id']} after {mqtt_time:.3f}s: {str(e)}"
+                        f"❌ MQTT batch send failed after {mqtt_time:.3f}s: {str(e)}"
                     )
 
             notification_total_time = time.time() - notification_start
