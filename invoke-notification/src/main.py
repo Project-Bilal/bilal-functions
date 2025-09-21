@@ -28,16 +28,28 @@ This function handles MQTT notifications for Bilal devices. It's primarily used 
 Note: The main prayer notification flow now uses notification-checker for better performance.
 This function is primarily used for BLE operations, manual testing, and one-off MQTT commands.
 
-MQTT Broker: broker.hivemq.com:1883 (QoS 1 for delivery assurance)
+MQTT Broker: Uses MQTT_BROKER_HOST and MQTT_BROKER_PORT environment variables (QoS 1 for delivery assurance)
 """
 
 
-def send_mqtt_message(topic, message, broker="broker.hivemq.com", port=1883):
+def send_mqtt_message(topic, message, broker=None, port=None):
     """
     Send a message to the MQTT broker
     """
     import time
     import threading
+    import os
+
+    # Use environment variables for broker configuration
+    if broker is None:
+        broker = os.environ.get("MQTT_BROKER_HOST")
+        if not broker:
+            raise Exception("MQTT_BROKER_HOST environment variable is required")
+    if port is None:
+        port_str = os.environ.get("MQTT_BROKER_PORT")
+        if not port_str:
+            raise Exception("MQTT_BROKER_PORT environment variable is required")
+        port = int(port_str)
 
     # Use threading events to track connection status
     connected_event = threading.Event()
@@ -132,7 +144,8 @@ def main(context):
                         "message": result_message,
                         "topic": topic,
                         "sent_message": message,
-                        "broker": "broker.hivemq.com",
+                        "broker": os.environ.get("MQTT_BROKER_HOST")
+                        or "not configured",
                         "action_type": "ble",
                     }
                 )
@@ -142,7 +155,8 @@ def main(context):
                         "success": False,
                         "error": result_message,
                         "topic": topic,
-                        "broker": "broker.hivemq.com",
+                        "broker": os.environ.get("MQTT_BROKER_HOST")
+                        or "not configured",
                         "action_type": "ble",
                     },
                     500,
@@ -199,7 +213,8 @@ def main(context):
                         "message": result_message,
                         "topic": topic,
                         "sent_message": message,
-                        "broker": "broker.hivemq.com",
+                        "broker": os.environ.get("MQTT_BROKER_HOST")
+                        or "not configured",
                         "action_type": "play",
                     }
                 )
@@ -209,7 +224,8 @@ def main(context):
                         "success": False,
                         "error": result_message,
                         "topic": topic,
-                        "broker": "broker.hivemq.com",
+                        "broker": os.environ.get("MQTT_BROKER_HOST")
+                        or "not configured",
                         "action_type": "play",
                     },
                     500,

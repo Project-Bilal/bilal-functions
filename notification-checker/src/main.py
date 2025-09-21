@@ -9,10 +9,21 @@ import paho.mqtt.client as mqtt
 import threading
 
 
-def send_mqtt_message(topic, message, broker="broker.hivemq.com", port=1883):
+def send_mqtt_message(topic, message, broker=None, port=None):
     """
     Send a message to the MQTT broker
     """
+    # Use environment variables for broker configuration
+    if broker is None:
+        broker = os.environ.get("MQTT_BROKER_HOST")
+        if not broker:
+            raise Exception("MQTT_BROKER_HOST environment variable is required")
+    if port is None:
+        port_str = os.environ.get("MQTT_BROKER_PORT")
+        if not port_str:
+            raise Exception("MQTT_BROKER_PORT environment variable is required")
+        port = int(port_str)
+
     # Use threading events to track connection status
     connected_event = threading.Event()
     connection_error = None
@@ -150,7 +161,18 @@ def main(context):
                     mqtt_client.on_disconnect = on_disconnect
 
                     # Connect to MQTT broker
-                    mqtt_client.connect("broker.hivemq.com", 1883, 60)
+                    broker_host = os.environ.get("MQTT_BROKER_HOST")
+                    if not broker_host:
+                        raise Exception(
+                            "MQTT_BROKER_HOST environment variable is required"
+                        )
+                    broker_port_str = os.environ.get("MQTT_BROKER_PORT")
+                    if not broker_port_str:
+                        raise Exception(
+                            "MQTT_BROKER_PORT environment variable is required"
+                        )
+                    broker_port = int(broker_port_str)
+                    mqtt_client.connect(broker_host, broker_port, 60)
                     mqtt_client.loop_start()
 
                     # Wait for connection
