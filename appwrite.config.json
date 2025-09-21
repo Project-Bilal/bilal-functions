@@ -81,25 +81,7 @@
             "entrypoint": "src/main.py",
             "commands": "pip install -r requirements.txt",
             "specification": "s-0.5vcpu-512mb",
-            "path": "functions/device-handler"
-        },
-        {
-            "$id": "prayer-times",
-            "execute": [
-                "any"
-            ],
-            "name": "prayer-times",
-            "enabled": true,
-            "logging": true,
-            "runtime": "python-3.12",
-            "scopes": [],
-            "events": [],
-            "schedule": "",
-            "timeout": 100,
-            "entrypoint": "src/main.py",
-            "commands": "pip install -r requirements.txt",
-            "specification": "s-1vcpu-512mb",
-            "path": "prayer-times"
+            "path": "device-handler"
         }
     ]
 }
