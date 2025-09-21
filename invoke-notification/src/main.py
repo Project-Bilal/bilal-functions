@@ -4,19 +4,31 @@ import json
 """
 Appwrite Function: invoke-notification
 
-This function handles two types of MQTT notifications:
+This function handles MQTT notifications for Bilal devices. It's primarily used for:
 
-1. BLE Action:
+1. BLE Action (Bluetooth Low Energy):
    - Input: {"ble": "1c-69-20-ea-c6-8c"}
    - Output: Sends MQTT message to "projectbilal/1c-69-20-ea-c6-8c"
    - Message: {"action": "ble", "props": {}}
+   - Use case: Bluetooth device discovery/connection
 
-2. Play Action:
+2. Play Action (Audio Playback):
+   - This is no longer used, we are using the notification-checker function instead
+   - This function is only here for backward compatibility and testing
    - Input: {"volume": "...", "audio_id": "...", "ip_address": "...", "port": "...", "device_id": "..."}
    - Output: Sends MQTT message to "projectbilal/{device_id}"
    - Message: {"action": "play", "props": {"volume": "...", "url": "...", "ip": "...", "port": ...}}
+   - Use case: Play prayer notifications/reminders, Chromecast testing
 
-Both actions use the same MQTT broker: broker.hivemq.com:1883
+3. Device Validation:
+   - Validates IP address and port before sending
+   - Skips offline devices (IP: 0.0.0.0 or null port)
+   - Returns appropriate error messages for invalid configurations
+
+Note: The main prayer notification flow now uses notification-checker for better performance.
+This function is primarily used for BLE operations, manual testing, and one-off MQTT commands.
+
+MQTT Broker: broker.hivemq.com:1883 (QoS 1 for delivery assurance)
 """
 
 
@@ -137,6 +149,8 @@ def main(context):
                 )
 
         # Check if all required fields are present for play action
+        # btw we are no longer using this part of the function, we are using the notification-checker function instead
+        # this function is only here for backward compatibility and testing
         required_fields = ["volume", "audio_id", "ip_address", "port", "device_id"]
         if all(field in data for field in required_fields):
             # Extract the required fields
