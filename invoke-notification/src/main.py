@@ -76,9 +76,9 @@ def send_mqtt_message(topic, message, broker="broker.hivemq.com", port=1883):
 
         print(f"✅ Connected to MQTT broker successfully")
 
-        # Publish message with QoS 0 for reliability
+        # Publish message with QoS 1 for broker delivery assurance
         print(f"📤 Publishing message to topic '{topic}': {message}")
-        result = client.publish(topic, message, qos=0)
+        result = client.publish(topic, message, qos=1)
         print(f"📤 Publish result: {result}")
 
         # Wait for the message to be sent
