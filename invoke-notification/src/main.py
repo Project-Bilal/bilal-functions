@@ -33,19 +33,16 @@ def send_mqtt_message(topic, message, broker="broker.hivemq.com", port=1883):
 
     def on_connect(client, userdata, flags, rc):
         if rc == 0:
-            print(f"✅ MQTT connection established (rc={rc})")
             connected_event.set()
         else:
-            print(f"❌ MQTT connection failed with code {rc}")
             nonlocal connection_error
             connection_error = f"Connection failed with code {rc}"
             connected_event.set()
 
     def on_disconnect(client, userdata, rc):
-        print(f"🔌 MQTT disconnected (rc={rc})")
+        pass
 
     try:
-        print(f"🔌 Creating MQTT client for topic: {topic}")
         # Create MQTT client with a unique client ID
         client = mqtt.Client(client_id=f"bilal_function_{hash(topic)}")
 
@@ -53,18 +50,14 @@ def send_mqtt_message(topic, message, broker="broker.hivemq.com", port=1883):
         client.on_connect = on_connect
         client.on_disconnect = on_disconnect
 
-        print(f"🔌 Attempting to connect to {broker}:{port}")
         # Set connection timeout
         client.connect(broker, port, 60)
-        print(f"🔌 Connection initiated")
 
         # Start the loop to handle the connection
         client.loop_start()
-        print(f"🔄 Started MQTT loop")
 
         # Wait for connection to be established with 10-second timeout
         max_wait_time = 10  # seconds
-        print(f"⏱️ Waiting for connection to establish (max {max_wait_time}s)...")
 
         if not connected_event.wait(timeout=max_wait_time):
             raise Exception(
@@ -74,25 +67,18 @@ def send_mqtt_message(topic, message, broker="broker.hivemq.com", port=1883):
         if connection_error:
             raise Exception(connection_error)
 
-        print(f"✅ Connected to MQTT broker successfully")
-
         # Publish message with QoS 1 for broker delivery assurance
-        print(f"📤 Publishing message to topic '{topic}': {message}")
         result = client.publish(topic, message, qos=1)
-        print(f"📤 Publish result: {result}")
 
         # Wait for the message to be sent
         result.wait_for_publish()
-        print(f"✅ Message published successfully")
 
         # Stop the loop and disconnect
         client.loop_stop()
         client.disconnect()
-        print(f"🔌 Disconnected from MQTT broker")
 
         return True, "Message sent successfully"
     except Exception as e:
-        print(f"❌ MQTT error: {str(e)}")
         return False, f"Failed to send message: {str(e)}"
 
 
@@ -100,9 +86,6 @@ def send_mqtt_message(topic, message, broker="broker.hivemq.com", port=1883):
 def main(context):
     try:
         data = context.req.body_json
-
-        # Log the incoming request for debugging
-        context.log(f"Received request with data: {json.dumps(data)}")
 
         # Check if this is a BLE action
         if "ble" in data:
@@ -127,18 +110,10 @@ def main(context):
             message = json.dumps(message_obj)
             topic = f"projectbilal/{ble_address}"
 
-            context.log(f"Processing BLE action for device {ble_address}")
-            context.log(f"Topic: {topic}")
-            context.log(f"Message: {message}")
-
             # Send message to MQTT broker
             success, result_message = send_mqtt_message(topic, message)
 
             if success:
-                context.log(f"MQTT message sent to {topic}: {message}")
-                context.log(
-                    f"BLE action completed successfully for device {ble_address}"
-                )
                 return context.res.json(
                     {
                         "success": True,
@@ -150,7 +125,6 @@ def main(context):
                     }
                 )
             else:
-                context.error(f"Failed to send MQTT message: {result_message}")
                 return context.res.json(
                     {
                         "success": False,
@@ -174,9 +148,6 @@ def main(context):
 
             # Validate IP address and port before proceeding
             if not ip_address or ip_address == "0.0.0.0" or not port:
-                context.log(
-                    f"⚠️ Skipping notification for device {device_id} - invalid IP/port (IP: {ip_address}, Port: {port})"
-                )
                 return context.res.json(
                     {
                         "success": False,
@@ -204,22 +175,10 @@ def main(context):
             message = json.dumps(message_obj)
             topic = f"projectbilal/{device_id}"
 
-            context.log(f"Processing play action for device {device_id}")
-            context.log(f"Topic: {topic}")
-            context.log(f"Message: {message}")
-
             # Send message to MQTT broker
-            context.log(f"Attempting to send MQTT message to broker...")
             success, result_message = send_mqtt_message(topic, message)
-            context.log(
-                f"MQTT send result: success={success}, message='{result_message}'"
-            )
 
             if success:
-                context.log(f"✅ MQTT message sent successfully to {topic}: {message}")
-                context.log(
-                    f"✅ Play action completed successfully for device {device_id}"
-                )
                 return context.res.json(
                     {
                         "success": True,
@@ -231,8 +190,6 @@ def main(context):
                     }
                 )
             else:
-                context.error(f"❌ Failed to send MQTT message: {result_message}")
-                context.error(f"❌ MQTT send failed for device {device_id}")
                 return context.res.json(
                     {
                         "success": False,
