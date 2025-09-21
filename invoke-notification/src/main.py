@@ -25,32 +25,42 @@ def send_mqtt_message(topic, message, broker="broker.hivemq.com", port=1883):
     Send a message to the MQTT broker
     """
     try:
+        print(f"🔌 Creating MQTT client for topic: {topic}")
         # Create MQTT client with a unique client ID
         client = mqtt.Client(client_id=f"bilal_function_{hash(topic)}")
 
+        print(f"🔌 Attempting to connect to {broker}:{port}")
         # Set connection timeout
         client.connect(broker, port, 60)
+        print(f"✅ Connected to MQTT broker")
 
         # Start the loop to handle the connection
         client.loop_start()
+        print(f"🔄 Started MQTT loop")
 
         # Wait a moment for connection to establish
         import time
 
         time.sleep(1)
+        print(f"⏱️ Waited 1 second for connection")
 
         # Publish message with QoS 1 for reliability
+        print(f"📤 Publishing message to topic '{topic}': {message}")
         result = client.publish(topic, message, qos=0)
+        print(f"📤 Publish result: {result}")
 
         # Wait for the message to be sent
         result.wait_for_publish()
+        print(f"✅ Message published successfully")
 
         # Stop the loop and disconnect
         client.loop_stop()
         client.disconnect()
+        print(f"🔌 Disconnected from MQTT broker")
 
         return True, "Message sent successfully"
     except Exception as e:
+        print(f"❌ MQTT error: {str(e)}")
         return False, f"Failed to send message: {str(e)}"
 
 
@@ -167,12 +177,16 @@ def main(context):
             context.log(f"Message: {message}")
 
             # Send message to MQTT broker
+            context.log(f"Attempting to send MQTT message to broker...")
             success, result_message = send_mqtt_message(topic, message)
+            context.log(
+                f"MQTT send result: success={success}, message='{result_message}'"
+            )
 
             if success:
-                context.log(f"MQTT message sent to {topic}: {message}")
+                context.log(f"✅ MQTT message sent successfully to {topic}: {message}")
                 context.log(
-                    f"Play action completed successfully for device {device_id}"
+                    f"✅ Play action completed successfully for device {device_id}"
                 )
                 return context.res.json(
                     {
@@ -185,7 +199,8 @@ def main(context):
                     }
                 )
             else:
-                context.error(f"Failed to send MQTT message: {result_message}")
+                context.error(f"❌ Failed to send MQTT message: {result_message}")
+                context.error(f"❌ MQTT send failed for device {device_id}")
                 return context.res.json(
                     {
                         "success": False,
