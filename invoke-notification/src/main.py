@@ -24,27 +24,59 @@ def send_mqtt_message(topic, message, broker="broker.hivemq.com", port=1883):
     """
     Send a message to the MQTT broker
     """
+    import time
+    import threading
+
+    # Use threading events to track connection status
+    connected_event = threading.Event()
+    connection_error = None
+
+    def on_connect(client, userdata, flags, rc):
+        if rc == 0:
+            print(f"✅ MQTT connection established (rc={rc})")
+            connected_event.set()
+        else:
+            print(f"❌ MQTT connection failed with code {rc}")
+            nonlocal connection_error
+            connection_error = f"Connection failed with code {rc}"
+            connected_event.set()
+
+    def on_disconnect(client, userdata, rc):
+        print(f"🔌 MQTT disconnected (rc={rc})")
+
     try:
         print(f"🔌 Creating MQTT client for topic: {topic}")
         # Create MQTT client with a unique client ID
         client = mqtt.Client(client_id=f"bilal_function_{hash(topic)}")
 
+        # Set up callbacks
+        client.on_connect = on_connect
+        client.on_disconnect = on_disconnect
+
         print(f"🔌 Attempting to connect to {broker}:{port}")
         # Set connection timeout
         client.connect(broker, port, 60)
-        print(f"✅ Connected to MQTT broker")
+        print(f"🔌 Connection initiated")
 
         # Start the loop to handle the connection
         client.loop_start()
         print(f"🔄 Started MQTT loop")
 
-        # Wait a moment for connection to establish
-        import time
+        # Wait for connection to be established with 10-second timeout
+        max_wait_time = 10  # seconds
+        print(f"⏱️ Waiting for connection to establish (max {max_wait_time}s)...")
 
-        time.sleep(1)
-        print(f"⏱️ Waited 1 second for connection")
+        if not connected_event.wait(timeout=max_wait_time):
+            raise Exception(
+                f"Failed to connect to MQTT broker within {max_wait_time} seconds"
+            )
 
-        # Publish message with QoS 1 for reliability
+        if connection_error:
+            raise Exception(connection_error)
+
+        print(f"✅ Connected to MQTT broker successfully")
+
+        # Publish message with QoS 0 for reliability
         print(f"📤 Publishing message to topic '{topic}': {message}")
         result = client.publish(topic, message, qos=0)
         print(f"📤 Publish result: {result}")
