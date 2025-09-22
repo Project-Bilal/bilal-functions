@@ -276,9 +276,7 @@ def build_notifications_for_device(device, date_str, context):
     required_fields = ["latitude", "longitude", "method"]
     for field in required_fields:
         if not device.get(field):
-            context.log(
-                f"Device {device.get('device_id', 'unknown')} missing {field}, skipping"
-            )
+            pass
             return notifications
 
     # Parse the date string once per device (DD-MM-YYYY format)
@@ -408,7 +406,7 @@ def main(context):
                 database_id="projectbilal",
                 collection_id="timings",
             )["documents"]
-        context.log(f"Found {len(devices)} devices and {len(timings)} timings")
+        pass
 
         # Group timings by device_id
         timings_by_device = group_timings_by_device(timings)
@@ -433,7 +431,7 @@ def main(context):
             )
             all_notifications.extend(notifications)
 
-        context.log(f"Prepared {len(all_notifications)} notifications")
+        pass
 
         if all_notifications:
             # Get unique device IDs from notifications

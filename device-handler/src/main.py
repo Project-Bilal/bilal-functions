@@ -101,7 +101,7 @@ def handle_device_deletion(context, databases, database_id, device_id):
                 )
         except AppwriteException as e:
             # Log error but continue with other operations
-            context.log(f"Error deleting from timings collection: {e}")
+            pass
 
         # Delete documents from notifications collection where device_id matches
         try:
@@ -119,7 +119,7 @@ def handle_device_deletion(context, databases, database_id, device_id):
                 )
         except AppwriteException as e:
             # Log error but continue with other operations
-            context.log(f"Error deleting from notifications collection: {e}")
+            pass
 
         # Update the device document (don't delete, just update fields)
         try:
@@ -304,8 +304,8 @@ def handle_device_onboarding(
                     )
                 timings_created = True
             except AppwriteException as e:
-                context.log(f"Error creating timing documents: {e}")
                 # Continue with onboarding even if timing creation fails
+                pass
 
         return context.res.json(
             {
@@ -398,12 +398,10 @@ def handle_device_disable_with_cleanup(context, databases, database_id, device_i
                     collection_id="notifications",
                     document_id=document["$id"],
                 )
-            context.log(
-                f"Deleted {len(notifications_response['documents'])} notifications for device {device_id}"
-            )
+            pass
         except AppwriteException as e:
             # Log error but continue with device update
-            context.log(f"Error deleting notifications for device {device_id}: {e}")
+            pass
 
         # Set device to disabled
         try:
@@ -421,7 +419,7 @@ def handle_device_disable_with_cleanup(context, databases, database_id, device_i
                     document_id=device_doc["$id"],
                     data={"enabled": False},
                 )
-                context.log(f"Device {device_id} disabled successfully")
+                pass
             else:
                 return context.res.json(
                     {
