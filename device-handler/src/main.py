@@ -224,6 +224,10 @@ def handle_device_onboarding(
                     )
 
                 # Device is either unclaimed (user_id is null) or belongs to current user
+                # Preserve existing status if it's "online", otherwise set to "pending"
+                current_status = device_doc.get("status", "offline")
+                new_status = "online" if current_status == "online" else "pending"
+                
                 databases.update_document(
                     database_id=database_id,
                     collection_id="devices",
@@ -231,7 +235,7 @@ def handle_device_onboarding(
                     data={
                         "user_id": user_id,
                         "name": device_name,
-                        "status": "pending",
+                        "status": new_status,
                         "latitude": latitude,
                         "longitude": longitude,
                         "method": method,
@@ -245,7 +249,7 @@ def handle_device_onboarding(
                 )
             else:
                 # Device doesn't exist, create it
-
+                # New devices start as "pending" since they haven't connected yet
                 databases.create_document(
                     database_id=database_id,
                     collection_id="devices",
