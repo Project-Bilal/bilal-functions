@@ -151,6 +151,7 @@ def handle_device_deletion(context, databases, database_id, device_id):
                         "name": "unclaimed_device",
                         "speaker_name": "",
                         "status": "offline",
+                        "timezone": None,
                     },
                 )
             else:

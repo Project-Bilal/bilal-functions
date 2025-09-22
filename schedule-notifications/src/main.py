@@ -40,6 +40,27 @@ def get_timezone_from_coordinates(
         raise ValueError(f"Failed to get timezone: {str(e)}")
 
 
+def get_timezone_date(device_timezone):
+    """Get the current date in the device's timezone"""
+    if not device_timezone:
+        # Fallback to UTC if no timezone
+        return datetime.now(timezone.utc).date()
+
+    try:
+        # Get current UTC time
+        utc_now = datetime.now(timezone.utc)
+
+        # Convert to device timezone
+        device_tz = pytz.timezone(device_timezone)
+        local_time = utc_now.astimezone(device_tz)
+
+        # Return the date in the device's timezone
+        return local_time.date()
+    except Exception as e:
+        # Fallback to UTC if timezone conversion fails
+        return datetime.now(timezone.utc).date()
+
+
 def get_utc_times(timestamp_str, mins=0, target_date=None, prayer_name=None):
     """Convert UTC time string to UTC and compute reminder time if needed."""
     # Handle both ISO 8601 format and simple time format (HH:MM)
@@ -123,6 +144,7 @@ def build_device_object(device, timings):
         "device_id": device.get("device_id"),
         "latitude": device.get("latitude"),
         "longitude": device.get("longitude"),
+        "timezone": device.get("timezone"),
         "method": device.get("method"),
         "midnight_mode": device.get("midnight_mode"),
         "school": device.get("school"),
@@ -233,23 +255,31 @@ def calculate_prayer_times(
         raise e
 
 
-def fetch_prayer_time(date_str, lat, lon, method, school, context):
-    """Calculate prayer timings using UTC calculation and get timezone."""
+def fetch_prayer_time(date_str, lat, lon, method, school, timezone_id, context):
+    """Calculate prayer timings using UTC calculation and stored timezone."""
     try:
         # Parse the date string (DD-MM-YYYY format)
         day, month, year = date_str.split("-")
         target_date = datetime(int(year), int(month), int(day), tzinfo=timezone.utc)
 
-        # Get timezone for the coordinates
-        if GOOGLE_API_KEY:
-            try:
-                timezone_id = get_timezone_from_coordinates(lat, lon, GOOGLE_API_KEY)
-            except Exception as e:
-                context.error(f"Failed to get timezone from coordinates: {str(e)}")
-                raise ValueError(f"Unable to determine timezone: {str(e)}")
+        # Use stored timezone if available, otherwise fallback to API
+        if not timezone_id:
+            if GOOGLE_API_KEY:
+                try:
+                    timezone_id = get_timezone_from_coordinates(
+                        lat, lon, GOOGLE_API_KEY
+                    )
+                    context.log(f"Retrieved timezone from API: {timezone_id}")
+                except Exception as e:
+                    context.error(f"Failed to get timezone from coordinates: {str(e)}")
+                    raise ValueError(f"Unable to determine timezone: {str(e)}")
+            else:
+                context.error(
+                    "No stored timezone and Google API key is required for timezone lookup"
+                )
+                raise ValueError("Google API key is required for timezone lookup")
         else:
-            context.error("Google API key is required for timezone lookup")
-            raise ValueError("Google API key is required for timezone lookup")
+            context.log(f"Using stored timezone: {timezone_id}")
 
         # Calculate prayer times using UTC calculation
         timings = calculate_prayer_times(
@@ -268,7 +298,7 @@ def fetch_prayer_time(date_str, lat, lon, method, school, context):
         raise e
 
 
-def build_notifications_for_device(device, date_str, context):
+def build_notifications_for_device(device, target_date, context):
     """Build notification payloads for a single device."""
     notifications = []
 
@@ -279,9 +309,8 @@ def build_notifications_for_device(device, date_str, context):
             pass
             return notifications
 
-    # Parse the date string once per device (DD-MM-YYYY format)
-    day, month, year = date_str.split("-")
-    target_date = datetime(int(year), int(month), int(day)).date()
+    # Convert target_date to date string for prayer calculation
+    date_str = target_date.strftime("%d-%m-%Y")
 
     try:
         timings, timezone_id = fetch_prayer_time(
@@ -290,6 +319,7 @@ def build_notifications_for_device(device, date_str, context):
             device["longitude"],
             device["method"],
             device["school"],
+            device.get("timezone"),
             context,
         )
     except Exception as e:
@@ -368,9 +398,6 @@ def build_notifications_for_device(device, date_str, context):
 
 
 def main(context):
-    now = datetime.now(timezone.utc)
-    date_str = now.strftime("%d-%m-%Y")
-
     client = init_appwrite_client(context)
     databases = Databases(client)
 
@@ -426,8 +453,16 @@ def main(context):
             device_obj = build_device_object(device, device_timings)
             devices_with_timings.append(device_obj)
 
+            # Get the current date in the device's timezone
+            device_timezone = device.get("timezone")
+            device_date = get_timezone_date(device_timezone)
+
+            context.log(
+                f"Processing device {device_id} with timezone {device_timezone}, using date {device_date}"
+            )
+
             notifications = build_notifications_for_device(
-                device_obj, date_str, context
+                device_obj, device_date, context
             )
             all_notifications.extend(notifications)
 
