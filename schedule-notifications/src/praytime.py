@@ -18,7 +18,6 @@ class PrayTime:
             "Makkah": {"fajr": 18.5, "isha": "90 min"},
             "Karachi": {"fajr": 18, "isha": 18},
             "Tehran": {"fajr": 17.7, "maghrib": 4.5, "midnight": "Jafari"},
-            "Jafari": {"fajr": 16, "maghrib": 4, "midnight": "Jafari"},
             "France": {"fajr": 12, "isha": 12},
             "Russia": {"fajr": 16, "isha": 15},
             "Singapore": {"fajr": 20, "isha": 18},
@@ -27,7 +26,6 @@ class PrayTime:
 
         # Numeric ID to method name mapping
         self.method_ids = {
-            0: "Jafari",
             1: "Karachi",
             2: "ISNA",
             3: "MWL",
