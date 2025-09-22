@@ -39,11 +39,12 @@ def main(context):
             "delete",
             "onboard",
             "status_update",
+            "disable_with_cleanup",
         ]:
             return context.res.json(
                 {
                     "success": False,
-                    "error": "Operation must be one of: delete, onboard, status_update",
+                    "error": "Operation must be one of: delete, onboard, status_update, disable_with_cleanup",
                 },
                 400,
             )
@@ -69,6 +70,10 @@ def main(context):
         elif operation == "status_update":
             return handle_device_status_update(
                 context, databases, database_id, device_id, request_data
+            )
+        elif operation == "disable_with_cleanup":
+            return handle_device_disable_with_cleanup(
+                context, databases, database_id, device_id
             )
 
     except Exception as e:
@@ -373,4 +378,73 @@ def handle_device_status_update(
         return context.res.json(
             {"success": False, "error": f"Error during device status update: {str(e)}"},
             500,
+        )
+
+
+def handle_device_disable_with_cleanup(context, databases, database_id, device_id):
+    """Handle device disable with notification cleanup"""
+    try:
+        # Delete notifications for this device
+        try:
+            notifications_response = databases.list_documents(
+                database_id=database_id,
+                collection_id="notifications",
+                queries=[Query.equal("device_id", device_id)],
+            )
+
+            for document in notifications_response["documents"]:
+                databases.delete_document(
+                    database_id=database_id,
+                    collection_id="notifications",
+                    document_id=document["$id"],
+                )
+            context.log(
+                f"Deleted {len(notifications_response['documents'])} notifications for device {device_id}"
+            )
+        except AppwriteException as e:
+            # Log error but continue with device update
+            context.log(f"Error deleting notifications for device {device_id}: {e}")
+
+        # Set device to disabled
+        try:
+            device_response = databases.list_documents(
+                database_id=database_id,
+                collection_id="devices",
+                queries=[Query.equal("device_id", device_id)],
+            )
+
+            if device_response["documents"]:
+                device_doc = device_response["documents"][0]
+                databases.update_document(
+                    database_id=database_id,
+                    collection_id="devices",
+                    document_id=device_doc["$id"],
+                    data={"enabled": False},
+                )
+                context.log(f"Device {device_id} disabled successfully")
+            else:
+                return context.res.json(
+                    {
+                        "success": False,
+                        "error": f"Device with device_id {device_id} not found",
+                    },
+                    404,
+                )
+        except AppwriteException as e:
+            return context.res.json(
+                {"success": False, "error": f"Error updating device: {str(e)}"}, 500
+            )
+
+        return context.res.json(
+            {
+                "success": True,
+                "message": f"Device {device_id} disabled and notifications cleaned up",
+                "notifications_deleted": True,
+                "device_disabled": True,
+            }
+        )
+
+    except Exception as e:
+        return context.res.json(
+            {"success": False, "error": f"Error during device disable: {str(e)}"}, 500
         )
