@@ -227,7 +227,7 @@ def handle_device_onboarding(
                 # Preserve existing status if it's "online", otherwise set to "pending"
                 current_status = device_doc.get("status", "offline")
                 new_status = "online" if current_status == "online" else "pending"
-                
+
                 databases.update_document(
                     database_id=database_id,
                     collection_id="devices",
