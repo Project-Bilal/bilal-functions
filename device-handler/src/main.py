@@ -337,10 +337,17 @@ def handle_device_status_update(
     """Handle device status update operation"""
     try:
         status = request_data.get("status")
+        firmware_version = request_data.get("firmware_version")
+
         if not status:
             return context.res.json(
                 {"success": False, "error": "Status is required for status update"}, 400
             )
+
+        # Prepare update data
+        update_data = {"status": status}
+        if firmware_version:
+            update_data["firmware"] = firmware_version
 
         # Update the device document
         try:
@@ -356,13 +363,19 @@ def handle_device_status_update(
                     database_id=database_id,
                     collection_id="devices",
                     document_id=device_doc["$id"],
-                    data={"status": status},
+                    data=update_data,
                 )
+
+                message = f"Device {device_id} status updated to {status}"
+                if firmware_version:
+                    message += f" (firmware: {firmware_version})"
+
                 return context.res.json(
                     {
                         "success": True,
-                        "message": f"Device {device_id} status updated to {status}",
+                        "message": message,
                         "device_updated": True,
+                        "firmware_updated": firmware_version is not None,
                     }
                 )
             else:
