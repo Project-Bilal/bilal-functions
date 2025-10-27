@@ -177,10 +177,10 @@ def main(context):
         # Check if all required fields are present for play action
         # btw we are no longer using this part of the function, we are using the notification-checker function instead
         # this function is only here for backward compatibility and testing
-        required_fields = ["volume", "audio_id", "ip_address", "port", "device_id"]
+        required_fields = ["audio_id", "ip_address", "port", "device_id"]
         if all(field in data for field in required_fields):
             # Extract the required fields
-            volume = data["volume"]
+            volume = data.get("volume")  # Optional - can be None
             audio_id = data["audio_id"]
             ip_address = data["ip_address"]
             port = data["port"]
