@@ -1,6 +1,7 @@
 import paho.mqtt.client as mqtt
 import json
 import os
+import time
 
 """
 Appwrite Function: invoke-notification
@@ -110,6 +111,16 @@ def send_mqtt_message(topic, message, broker=None, port=None):
 # This Appwrite function will be executed every time your function is triggered
 def main(context):
     try:
+        # Handle keep-warm pings (scheduled executions with empty body)
+        if not context.req.body or context.req.body.strip() == "":
+            return context.res.json(
+                {
+                    "success": True,
+                    "message": "Keep-alive ping",
+                    "timestamp": time.time(),
+                }
+            )
+
         data = context.req.body_json
 
         # Check if this is a BLE action
