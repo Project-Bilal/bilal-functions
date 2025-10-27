@@ -4,14 +4,16 @@
     "functions": [
         {
             "$id": "invoke-notification",
-            "execute": [],
+            "execute": [
+                "users"
+            ],
             "name": "invoke-notification",
             "enabled": true,
             "logging": true,
             "runtime": "python-3.12",
             "scopes": [],
             "events": [],
-            "schedule": "",
+            "schedule": "*/2 * * * *",
             "timeout": 100,
             "entrypoint": "src/main.py",
             "commands": "pip install -r requirements.txt",
@@ -53,7 +55,7 @@
                 "documents.write"
             ],
             "events": [],
-            "schedule": "0 9 * * *",
+            "schedule": "0 * * * *",
             "timeout": 100,
             "entrypoint": "src/main.py",
             "commands": "pip install -r requirements.txt",
