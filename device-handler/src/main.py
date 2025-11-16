@@ -87,7 +87,7 @@ def handle_device_deletion(context, databases, database_id, device_id):
     try:
         # Delete documents from timings collection where device_id matches
         try:
-            timings_response = databases.list_rows(
+            timings_response = databases.list_documents(
                 database_id=database_id,
                 collection_id="timings",
                 queries=[Query.equal("device_id", device_id)],
@@ -105,7 +105,7 @@ def handle_device_deletion(context, databases, database_id, device_id):
 
         # Delete documents from notifications collection where device_id matches
         try:
-            notifications_response = databases.list_rows(
+            notifications_response = databases.list_documents(
                 database_id=database_id,
                 collection_id="notifications",
                 queries=[Query.equal("device_id", device_id)],
@@ -124,7 +124,7 @@ def handle_device_deletion(context, databases, database_id, device_id):
         # Update the device document (don't delete, just update fields)
         try:
             # First, find the device document
-            device_response = databases.list_rows(
+            device_response = databases.list_documents(
                 database_id=database_id,
                 collection_id="devices",
                 queries=[Query.equal("device_id", device_id)],
@@ -211,12 +211,12 @@ def handle_device_onboarding(
         # Check if device already exists
         try:
             context.log(f"Checking if device {device_id} already exists in database")
-            device_response = databases.list_rows(
+            device_response = databases.list_documents(
                 database_id=database_id,
                 collection_id="devices",
                 queries=[Query.equal("device_id", device_id)],
             )
-            context.log(f"list_rows response keys: {device_response.keys()}")
+            context.log(f"list_documents response keys: {device_response.keys()}")
             context.log(
                 f"Found {len(device_response.get('documents', []))} existing device(s)"
             )
@@ -401,7 +401,7 @@ def handle_device_status_update(
 
         # Update the device document
         try:
-            device_response = databases.list_rows(
+            device_response = databases.list_documents(
                 database_id=database_id,
                 collection_id="devices",
                 queries=[Query.equal("device_id", device_id)],
@@ -454,7 +454,7 @@ def handle_device_disable_with_cleanup(context, databases, database_id, device_i
     try:
         # Delete notifications for this device
         try:
-            notifications_response = databases.list_rows(
+            notifications_response = databases.list_documents(
                 database_id=database_id,
                 collection_id="notifications",
                 queries=[Query.equal("device_id", device_id)],
@@ -473,7 +473,7 @@ def handle_device_disable_with_cleanup(context, databases, database_id, device_i
 
         # Set device to disabled
         try:
-            device_response = databases.list_rows(
+            device_response = databases.list_documents(
                 database_id=database_id,
                 collection_id="devices",
                 queries=[Query.equal("device_id", device_id)],
