@@ -193,7 +193,7 @@ def handle_device_onboarding(
         context.log(f"Device ID: {device_id}")
         context.log(f"User ID: {user_id}")
         context.log(f"Operation: onboard")
-        
+
         # Extract onboarding parameters from request data
         device_name = request_data.get("device_name", "New Device")
         latitude = request_data.get("latitude")
@@ -202,7 +202,7 @@ def handle_device_onboarding(
         midnight_mode = request_data.get("midnight_mode", "0")
         school = request_data.get("school", "0")
         speaker_name = request_data.get("speaker_name", "")
-        
+
         context.log(f"Device name: {device_name}")
 
         # Device validation, user validation, and configuration logic
@@ -217,15 +217,21 @@ def handle_device_onboarding(
                 queries=[Query.equal("device_id", device_id)],
             )
             context.log(f"list_rows response keys: {device_response.keys()}")
-            context.log(f"Found {len(device_response.get('documents', []))} existing device(s)")
+            context.log(
+                f"Found {len(device_response.get('documents', []))} existing device(s)"
+            )
 
             if device_response.get("documents"):
                 # Device exists, allow re-claiming by any user
                 # Physical access (BLE connection + factory reset) = ownership rights
                 # This enables device transfer, family sharing, and simplified onboarding
                 device_doc = device_response["documents"][0]
-                context.log(f"Device exists - updating existing device document: {device_doc['$id']}")
-                context.log(f"Current user_id: {device_doc.get('user_id')}, New user_id: {user_id}")
+                context.log(
+                    f"Device exists - updating existing device document: {device_doc['$id']}"
+                )
+                context.log(
+                    f"Current user_id: {device_doc.get('user_id')}, New user_id: {user_id}"
+                )
 
                 # Preserve existing status if it's "online", otherwise set to "pending"
                 current_status = device_doc.get("status", "offline")
@@ -289,7 +295,7 @@ def handle_device_onboarding(
         # This prevents conflicts regardless of whether device is being claimed or not
         prayer_names = ["Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"]
         context.log(f"Starting timing document cleanup for device: {device_id}")
-        
+
         deleted_count = 0
         for prayer_name in prayer_names:
             try:
@@ -297,14 +303,16 @@ def handle_device_onboarding(
                 databases.delete_document(
                     database_id=database_id,
                     collection_id="timings",
-                    document_id=timing_doc_id
+                    document_id=timing_doc_id,
                 )
                 deleted_count += 1
                 context.log(f"Deleted existing timing: {timing_doc_id}")
             except AppwriteException as e:
                 # Document doesn't exist, that's fine - continue
-                context.log(f"No existing timing for {prayer_name} (this is normal for new devices)")
-        
+                context.log(
+                    f"No existing timing for {prayer_name} (this is normal for new devices)"
+                )
+
         context.log(f"Deleted {deleted_count} existing timing documents")
 
         # Only CREATE new timings if device is being claimed (user_id is not null)
@@ -340,11 +348,13 @@ def handle_device_onboarding(
                 context.error(f"Failed to create timing documents: {str(e)}")
                 pass
         else:
-            context.log("Skipping timing creation - device being onboarded as unclaimed")
+            context.log(
+                "Skipping timing creation - device being onboarded as unclaimed"
+            )
 
         context.log(f"=== Onboarding completed successfully ===")
         context.log(f"Timings created: {timings_created}")
-        
+
         return context.res.json(
             {
                 "success": True,
@@ -362,8 +372,9 @@ def handle_device_onboarding(
         context.error(f"Error: {str(e)}")
         context.error(f"Error type: {type(e).__name__}")
         import traceback
+
         context.error(f"Traceback: {traceback.format_exc()}")
-        
+
         return context.res.json(
             {"success": False, "error": f"Error during device onboarding: {str(e)}"},
             500,
