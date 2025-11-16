@@ -284,9 +284,22 @@ def handle_device_onboarding(
         # Only create timings if device is being claimed (user_id is not null)
         timings_created = False
         if user_id is not None:
-            # Create 5 new documents in the timings collection for each prayer
             prayer_names = ["Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"]
 
+            # First, delete any existing timing documents for this device
+            # This handles re-onboarding scenarios where timings already exist
+            for prayer_name in prayer_names:
+                try:
+                    databases.delete_document(
+                        database_id=database_id,
+                        collection_id="timings",
+                        document_id=f"{device_id}_{prayer_name.lower()}"
+                    )
+                except AppwriteException:
+                    # Document doesn't exist, that's fine - continue
+                    pass
+
+            # Now create fresh timing documents
             try:
                 for prayer_name in prayer_names:
                     databases.create_document(
