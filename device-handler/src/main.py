@@ -210,21 +210,11 @@ def handle_device_onboarding(
             )
 
             if device_response["documents"]:
-                # Device exists, check ownership
+                # Device exists, allow re-claiming by any user
+                # Physical access (BLE connection + factory reset) = ownership rights
+                # This enables device transfer, family sharing, and simplified onboarding
                 device_doc = device_response["documents"][0]
-                existing_user_id = device_doc.get("user_id")
 
-                # Check if device is already claimed by another user
-                if existing_user_id and existing_user_id != user_id:
-                    return context.res.json(
-                        {
-                            "success": False,
-                            "error": f"Device is already claimed by another user. Cannot onboard device {device_id}",
-                        },
-                        409,  # Conflict status code
-                    )
-
-                # Device is either unclaimed (user_id is null) or belongs to current user
                 # Preserve existing status if it's "online", otherwise set to "pending"
                 current_status = device_doc.get("status", "offline")
                 new_status = "online" if current_status == "online" else "pending"
