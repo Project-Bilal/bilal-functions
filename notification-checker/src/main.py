@@ -22,6 +22,22 @@ def ntfy_alert(message: str, topic: str = "projectbilal-errors", title: str = "P
         pass  # Never break main flow
 
 
+def _doclist_total(doclist):
+    if hasattr(doclist, "total"):
+        return doclist.total
+    if isinstance(doclist, dict):
+        return doclist.get("total", 0)
+    return 0
+
+
+def _doclist_documents(doclist):
+    if hasattr(doclist, "documents"):
+        return doclist.documents
+    if isinstance(doclist, dict):
+        return doclist.get("documents", [])
+    return []
+
+
 def send_mqtt_message(topic, message, broker=None, port=None):
     """
     Send a message to the MQTT broker
@@ -116,13 +132,15 @@ def main(context):
                 Query.equal("enabled", True),
             ],
         )
+        notifications_total = _doclist_total(notifications)
+        notification_documents = _doclist_documents(notifications)
 
-        if notifications["total"] > 0:
+        if notifications_total > 0:
             processed_count = 0
 
             # Prepare all valid notifications first
             valid_notifications = []
-            for notification in notifications["documents"]:
+            for notification in notification_documents:
                 # Skip disabled notifications (safety check)
                 if not notification.get("enabled", True):
                     continue
@@ -252,14 +270,14 @@ def main(context):
             else:
                 # Notifications due but all devices offline or invalid
                 ntfy_alert(
-                    f"[notification-checker] {notifications['total']} notifications due, all devices offline",
+                    f"[notification-checker] {notifications_total} notifications due, all devices offline",
                     topic="projectbilal-events",
                 )
 
             return context.res.json(
                 {
                     "success": True,
-                    "total_notifications": notifications["total"],
+                    "total_notifications": notifications_total,
                     "processed_notifications": processed_count,
                 }
             )
@@ -268,7 +286,7 @@ def main(context):
             {
                 "success": True,
                 "current_time": current_time,
-                "total_notifications": notifications["total"],
+                "total_notifications": notifications_total,
             }
         )
 

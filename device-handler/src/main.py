@@ -19,6 +19,14 @@ def ntfy_alert(message: str, topic: str = "projectbilal-errors", title: str = "P
         pass  # Never break main flow
 
 
+def _doclist_documents(doclist):
+    if hasattr(doclist, "documents"):
+        return doclist.documents
+    if isinstance(doclist, dict):
+        return doclist.get("documents", [])
+    return []
+
+
 def main(context):
     try:
         # Parse the request body
@@ -107,7 +115,7 @@ def handle_device_deletion(context, databases, database_id, device_id):
                 queries=[Query.equal("device_id", device_id)],
             )
 
-            for document in timings_response["documents"]:
+            for document in _doclist_documents(timings_response):
                 databases.delete_document(
                     database_id=database_id,
                     collection_id="timings",
@@ -125,7 +133,7 @@ def handle_device_deletion(context, databases, database_id, device_id):
                 queries=[Query.equal("device_id", device_id)],
             )
 
-            for document in notifications_response["documents"]:
+            for document in _doclist_documents(notifications_response):
                 databases.delete_document(
                     database_id=database_id,
                     collection_id="notifications",
@@ -144,8 +152,9 @@ def handle_device_deletion(context, databases, database_id, device_id):
                 queries=[Query.equal("device_id", device_id)],
             )
 
-            if device_response["documents"]:
-                device_doc = device_response["documents"][0]
+            device_documents = _doclist_documents(device_response)
+            if device_documents:
+                device_doc = device_documents[0]
 
                 # Update the device document with the specified values
                 databases.update_document(
@@ -236,16 +245,17 @@ def handle_device_onboarding(
                 collection_id="devices",
                 queries=[Query.equal("device_id", device_id)],
             )
-            context.log(f"list_documents response keys: {device_response.keys()}")
+            context.log(f"list_documents response type: {type(device_response).__name__}")
             context.log(
-                f"Found {len(device_response.get('documents', []))} existing device(s)"
+                f"Found {len(_doclist_documents(device_response))} existing device(s)"
             )
 
-            if device_response.get("documents"):
+            device_documents = _doclist_documents(device_response)
+            if device_documents:
                 # Device exists, allow re-claiming by any user
                 # Physical access (BLE connection + factory reset) = ownership rights
                 # This enables device transfer, family sharing, and simplified onboarding
-                device_doc = device_response["documents"][0]
+                device_doc = device_documents[0]
                 context.log(
                     f"Device exists - updating existing device document: {device_doc['$id']}"
                 )
@@ -433,8 +443,9 @@ def handle_device_status_update(
                 queries=[Query.equal("device_id", device_id)],
             )
 
-            if device_response["documents"]:
-                device_doc = device_response["documents"][0]
+            device_documents = _doclist_documents(device_response)
+            if device_documents:
+                device_doc = device_documents[0]
                 databases.update_document(
                     database_id=database_id,
                     collection_id="devices",
@@ -486,7 +497,7 @@ def handle_device_disable_with_cleanup(context, databases, database_id, device_i
                 queries=[Query.equal("device_id", device_id)],
             )
 
-            for document in notifications_response["documents"]:
+            for document in _doclist_documents(notifications_response):
                 databases.delete_document(
                     database_id=database_id,
                     collection_id="notifications",
@@ -505,8 +516,9 @@ def handle_device_disable_with_cleanup(context, databases, database_id, device_i
                 queries=[Query.equal("device_id", device_id)],
             )
 
-            if device_response["documents"]:
-                device_doc = device_response["documents"][0]
+            device_documents = _doclist_documents(device_response)
+            if device_documents:
+                device_doc = device_documents[0]
                 databases.update_document(
                     database_id=database_id,
                     collection_id="devices",

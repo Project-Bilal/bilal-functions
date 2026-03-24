@@ -24,6 +24,14 @@ def ntfy_alert(message: str, topic: str = "projectbilal-errors", title: str = "P
     except Exception:
         pass  # Never break main flow
 
+
+def _doclist_documents(doclist):
+    if hasattr(doclist, "documents"):
+        return doclist.documents
+    if isinstance(doclist, dict):
+        return doclist.get("documents", [])
+    return []
+
 # Configuration for prayer calculation
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 GOOGLE_TIMEZONE_BASE_URL = "https://maps.googleapis.com/maps/api/timezone/json"
@@ -134,11 +142,13 @@ def init_appwrite_client(context):
 
 def fetch_enabled_devices(databases):
     """Fetch all enabled devices."""
-    return databases.list_documents(
+    return _doclist_documents(
+        databases.list_documents(
         database_id="projectbilal",
         collection_id="devices",
         queries=[Query.equal("enabled", True)],
-    )["documents"]
+        )
+    )
 
 
 def group_timings_by_device(timings):
@@ -421,31 +431,37 @@ def main(context):
 
         if target_device_id:
             # Process only the specified device
-            devices = databases.list_documents(
+            devices = _doclist_documents(
+                databases.list_documents(
                 database_id="projectbilal",
                 collection_id="devices",
                 queries=[
                     Query.equal("enabled", True),
                     Query.equal("device_id", target_device_id),
                 ],
-            )["documents"]
+                )
+            )
 
             # Fetch all timings for this specific device (enabled and disabled)
-            timings = databases.list_documents(
+            timings = _doclist_documents(
+                databases.list_documents(
                 database_id="projectbilal",
                 collection_id="timings",
                 queries=[
                     Query.equal("device_id", target_device_id),
                 ],
-            )["documents"]
+                )
+            )
         else:
             # Process all devices (current behavior)
             devices = fetch_enabled_devices(databases)
             # Fetch all timings (enabled and disabled)
-            timings = databases.list_documents(
+            timings = _doclist_documents(
+                databases.list_documents(
                 database_id="projectbilal",
                 collection_id="timings",
-            )["documents"]
+                )
+            )
         pass
 
         # Group timings by device_id
