@@ -2,6 +2,20 @@ import paho.mqtt.client as mqtt
 import json
 import os
 import time
+import urllib.request
+
+NTFY_BASE = os.environ.get("NTFY_BASE_URL", "http://34.53.103.114")
+
+
+def ntfy_alert(message: str, topic: str = "projectbilal-errors", title: str = "Project Bilal"):
+    url = f"{NTFY_BASE}/{topic}"
+    try:
+        req = urllib.request.Request(url, data=message.encode(), method="POST")
+        req.add_header("Title", title)
+        urllib.request.urlopen(req, timeout=5)
+    except Exception:
+        pass  # Never break main flow
+
 
 """
 Appwrite Function: invoke-notification
@@ -150,6 +164,10 @@ def main(context):
             success, result_message = send_mqtt_message(topic, message)
 
             if success:
+                ntfy_alert(
+                    f"[invoke-notification] BLE action sent to {ble_address}",
+                    topic="projectbilal-events",
+                )
                 return context.res.json(
                     {
                         "success": True,
@@ -162,6 +180,9 @@ def main(context):
                     }
                 )
             else:
+                ntfy_alert(
+                    f"[invoke-notification] BLE MQTT failed for {ble_address}: {result_message}",
+                )
                 return context.res.json(
                     {
                         "success": False,
@@ -200,7 +221,7 @@ def main(context):
                     200,  # Return 200 since this is expected behavior, not an error
                 )
 
-            # Create the formatted message
+            # Create the formatted message (include label for ESP32 logging)
             message_obj = {
                 "action": "play",
                 "props": {
@@ -208,6 +229,7 @@ def main(context):
                     "url": audio_id,  # Using audio_id as url
                     "ip": ip_address,
                     "port": int(port),
+                    "label": "Manual test",
                 },
             }
 
@@ -219,6 +241,10 @@ def main(context):
             success, result_message = send_mqtt_message(topic, message)
 
             if success:
+                ntfy_alert(
+                    f"[invoke-notification] Play sent to {device_id} (manual test)",
+                    topic="projectbilal-events",
+                )
                 return context.res.json(
                     {
                         "success": True,
@@ -231,6 +257,9 @@ def main(context):
                     }
                 )
             else:
+                ntfy_alert(
+                    f"[invoke-notification] Play MQTT failed for {device_id}: {result_message}",
+                )
                 return context.res.json(
                     {
                         "success": False,
@@ -259,4 +288,9 @@ def main(context):
     except json.JSONDecodeError:
         return context.res.json(
             {"success": False, "error": "Invalid JSON in request body"}, 400
+        )
+    except Exception as e:
+        ntfy_alert(f"[invoke-notification] Unhandled error: {e}")
+        return context.res.json(
+            {"success": False, "error": str(e)}, 500
         )

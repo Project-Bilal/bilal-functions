@@ -5,8 +5,21 @@ from appwrite.query import Query
 import os
 import json
 import time
+import urllib.request
 import paho.mqtt.client as mqtt
 import threading
+
+NTFY_BASE = os.environ.get("NTFY_BASE_URL", "http://34.53.103.114")
+
+
+def ntfy_alert(message: str, topic: str = "projectbilal-errors", title: str = "Project Bilal"):
+    url = f"{NTFY_BASE}/{topic}"
+    try:
+        req = urllib.request.Request(url, data=message.encode(), method="POST")
+        req.add_header("Title", title)
+        urllib.request.urlopen(req, timeout=5)
+    except Exception:
+        pass  # Never break main flow
 
 
 def send_mqtt_message(topic, message, broker=None, port=None):
@@ -122,7 +135,7 @@ def main(context):
                 ):
                     continue
 
-                # Prepare notification data
+                # Prepare notification data (include timing_id and type for label derivation)
                 notification_data = {
                     "device_id": notification["device_id"],
                     "timestampUTC": notification["timestampUTC"],
@@ -130,6 +143,8 @@ def main(context):
                     "port": notification["port"],
                     "audio_id": notification["audio_id"],
                     "volume": notification["volume"],
+                    "timing_id": notification.get("timing_id"),
+                    "type": notification.get("type", "notification"),
                 }
                 valid_notifications.append(notification_data)
 
@@ -187,7 +202,14 @@ def main(context):
                     # Send all notifications
                     for notification_data in valid_notifications:
                         try:
-                            # Create the MQTT message
+                            # Derive label from timing_id (format: device_id_prayer) + type
+                            timing_id = notification_data.get("timing_id") or ""
+                            ntype = notification_data.get("type", "notification")
+                            prayer_part = timing_id.split("_")[-1] if "_" in timing_id else "?"
+                            label_base = prayer_part.capitalize() if prayer_part else "?"
+                            label = f"{label_base} reminder" if ntype == "reminder" else label_base
+
+                            # Create the MQTT message (include label for ESP32 logging)
                             message_obj = {
                                 "action": "play",
                                 "props": {
@@ -195,6 +217,7 @@ def main(context):
                                     "url": notification_data["audio_id"],
                                     "ip": notification_data["ip_address"],
                                     "port": int(notification_data["port"]),
+                                    "label": label,
                                 },
                             }
 
@@ -207,9 +230,16 @@ def main(context):
                             result.wait_for_publish()
 
                             processed_count += 1
+                            ntfy_alert(
+                                f"[notification-checker] Sent play to {notification_data['device_id']}: {label}",
+                                topic="projectbilal-events",
+                            )
 
                         except Exception as e:
                             context.error(f"Failed to send notification: {str(e)}")
+                            ntfy_alert(
+                                f"[notification-checker] Failed to send to device {notification_data.get('device_id', '?')}: {e}",
+                            )
 
                     # Disconnect
                     mqtt_client.loop_stop()
@@ -217,6 +247,14 @@ def main(context):
 
                 except Exception as e:
                     context.error(f"MQTT batch send failed: {str(e)}")
+                    ntfy_alert(f"[notification-checker] MQTT batch failed: {e}")
+
+            else:
+                # Notifications due but all devices offline or invalid
+                ntfy_alert(
+                    f"[notification-checker] {notifications['total']} notifications due, all devices offline",
+                    topic="projectbilal-events",
+                )
 
             return context.res.json(
                 {
@@ -235,6 +273,7 @@ def main(context):
         )
 
     except Exception as e:
+        ntfy_alert(f"[notification-checker] Unhandled error: {e}")
         return context.res.json(
             {"success": False, "error": str(e), "current_time": current_time}, 500
         )

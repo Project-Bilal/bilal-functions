@@ -6,10 +6,23 @@ import os
 import json
 import requests
 import time
+import urllib.request
 import pytz
 from collections import defaultdict
 from typing import Dict, Any
 from .praytime import PrayTime
+
+NTFY_BASE = os.environ.get("NTFY_BASE_URL", "http://34.53.103.114")
+
+
+def ntfy_alert(message: str, topic: str = "projectbilal-errors", title: str = "Project Bilal"):
+    url = f"{NTFY_BASE}/{topic}"
+    try:
+        req = urllib.request.Request(url, data=message.encode(), method="POST")
+        req.add_header("Title", title)
+        urllib.request.urlopen(req, timeout=5)
+    except Exception:
+        pass  # Never break main flow
 
 # Configuration for prayer calculation
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
@@ -483,8 +496,13 @@ def main(context):
                     collection_id="notifications",
                     documents=all_notifications,
                 )
+                ntfy_alert(
+                    f"[schedule-notifications] Scheduled {len(all_notifications)} notifications for {len(device_ids)} devices",
+                    topic="projectbilal-events",
+                )
             except Exception as e:
                 context.error(f"Failed to upsert notifications: {str(e)}")
+                ntfy_alert(f"[schedule-notifications] Failed to upsert: {e}")
 
         return context.res.json(
             {
@@ -496,4 +514,5 @@ def main(context):
 
     except Exception as e:
         context.error(f"Unhandled error: {str(e)}")
+        ntfy_alert(f"[schedule-notifications] Unhandled error: {e}")
         return context.res.json({"success": False, "error": str(e)}, 500)

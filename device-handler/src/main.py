@@ -4,6 +4,19 @@ from appwrite.exception import AppwriteException
 from appwrite.query import Query
 import json
 import os
+import urllib.request
+
+NTFY_BASE = os.environ.get("NTFY_BASE_URL", "http://34.53.103.114")
+
+
+def ntfy_alert(message: str, topic: str = "projectbilal-errors", title: str = "Project Bilal"):
+    url = f"{NTFY_BASE}/{topic}"
+    try:
+        req = urllib.request.Request(url, data=message.encode(), method="POST")
+        req.add_header("Title", title)
+        urllib.request.urlopen(req, timeout=5)
+    except Exception:
+        pass  # Never break main flow
 
 
 def main(context):
@@ -77,6 +90,7 @@ def main(context):
             )
 
     except Exception as e:
+        ntfy_alert(f"[device-handler] Unhandled error: {e}")
         return context.res.json(
             {"success": False, "error": f"Unexpected error: {str(e)}"}, 500
         )
@@ -164,10 +178,15 @@ def handle_device_deletion(context, databases, database_id, device_id):
                 )
 
         except AppwriteException as e:
+            ntfy_alert(f"[device-handler] Delete failed for {device_id}: {e}")
             return context.res.json(
                 {"success": False, "error": f"Error updating device: {str(e)}"}, 500
             )
 
+        ntfy_alert(
+            f"[device-handler] Device {device_id} removed",
+            topic="projectbilal-events",
+        )
         return context.res.json(
             {
                 "success": True,
@@ -179,6 +198,7 @@ def handle_device_deletion(context, databases, database_id, device_id):
         )
 
     except Exception as e:
+        ntfy_alert(f"[device-handler] Delete failed for {device_id}: {e}")
         return context.res.json(
             {"success": False, "error": f"Error during device deletion: {str(e)}"}, 500
         )
@@ -283,6 +303,7 @@ def handle_device_onboarding(
                 )
 
         except AppwriteException as e:
+            ntfy_alert(f"[device-handler] Onboarding failed for {device_id}: {e}")
             return context.res.json(
                 {
                     "success": False,
@@ -355,6 +376,10 @@ def handle_device_onboarding(
         context.log(f"=== Onboarding completed successfully ===")
         context.log(f"Timings created: {timings_created}")
 
+        ntfy_alert(
+            f"[device-handler] Device {device_id} onboarded",
+            topic="projectbilal-events",
+        )
         return context.res.json(
             {
                 "success": True,
@@ -374,6 +399,7 @@ def handle_device_onboarding(
         import traceback
 
         context.error(f"Traceback: {traceback.format_exc()}")
+        ntfy_alert(f"[device-handler] Onboarding failed for {device_id}: {e}")
 
         return context.res.json(
             {"success": False, "error": f"Error during device onboarding: {str(e)}"},
