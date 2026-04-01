@@ -25,12 +25,28 @@ def ntfy_alert(message: str, topic: str = "projectbilal-errors", title: str = "P
         pass  # Never break main flow
 
 
+def _document_to_plain_dict(doc):
+    """Normalize Appwrite Document models (Pydantic) or dicts to a flat dict."""
+    if isinstance(doc, dict):
+        return doc
+    to_dict = getattr(doc, "to_dict", None)
+    if callable(to_dict):
+        full = to_dict()
+        inner = full.pop("data", None)
+        if isinstance(inner, dict):
+            return {**inner, **full}
+        return full
+    return doc
+
+
 def _doclist_documents(doclist):
     if hasattr(doclist, "documents"):
-        return doclist.documents
-    if isinstance(doclist, dict):
-        return doclist.get("documents", [])
-    return []
+        raw = doclist.documents
+    elif isinstance(doclist, dict):
+        raw = doclist.get("documents", [])
+    else:
+        raw = []
+    return [_document_to_plain_dict(d) for d in raw]
 
 # Configuration for prayer calculation
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
