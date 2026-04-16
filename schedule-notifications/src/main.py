@@ -282,10 +282,7 @@ def send_ip_refresh_messages(devices, context):
             topic = f"projectbilal/{device_id}"
             message = json.dumps({
                 "action": "refresh_ip",
-                "props": {
-                    "speaker_name": speaker_name,
-                    "appwrite_key": os.environ.get("APPWRITE_API_KEY", ""),
-                },
+                "props": {"speaker_name": speaker_name},
             })
             result = mqtt_client.publish(topic, message, qos=1)
             result.wait_for_publish()

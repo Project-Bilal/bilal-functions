@@ -421,17 +421,21 @@ def handle_device_onboarding(
             f"[device-handler] Device {device_id} onboarded",
             topic="projectbilal-events",
         )
-        return context.res.json(
-            {
-                "success": True,
-                "message": f"Device {device_id} successfully onboarded",
-                "device_id": device_id,
-                "user_id": user_id,
-                "device_name": device_name,
-                "onboarded": True,
-                "timings_created": timings_created,
-            }
-        )
+        response_data = {
+            "success": True,
+            "message": f"Device {device_id} successfully onboarded",
+            "device_id": device_id,
+            "user_id": user_id,
+            "device_name": device_name,
+            "onboarded": True,
+            "timings_created": timings_created,
+        }
+        # Include API key for ESP32 provisioning when device is being claimed
+        if user_id is not None:
+            appwrite_key = os.environ.get("APPWRITE_API_KEY")
+            if appwrite_key:
+                response_data["appwrite_key"] = appwrite_key
+        return context.res.json(response_data)
 
     except Exception as e:
         context.error(f"=== Onboarding failed ===")
