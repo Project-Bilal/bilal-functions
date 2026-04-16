@@ -77,11 +77,12 @@ def main(context):
             "onboard",
             "status_update",
             "disable_with_cleanup",
+            "refresh_ip",
         ]:
             return context.res.json(
                 {
                     "success": False,
-                    "error": "Operation must be one of: delete, onboard, status_update, disable_with_cleanup",
+                    "error": "Operation must be one of: delete, onboard, status_update, disable_with_cleanup, refresh_ip",
                 },
                 400,
             )
@@ -111,6 +112,20 @@ def main(context):
         elif operation == "disable_with_cleanup":
             return handle_device_disable_with_cleanup(
                 context, databases, database_id, device_id
+            )
+        elif operation == "refresh_ip":
+            ip_address = request_data.get("ip_address")
+            port = request_data.get("port")
+            if not ip_address or not port:
+                return context.res.json(
+                    {
+                        "success": False,
+                        "error": "ip_address and port are required for refresh_ip",
+                    },
+                    400,
+                )
+            return handle_refresh_ip(
+                context, databases, database_id, device_id, ip_address, port
             )
 
     except Exception as e:
@@ -499,6 +514,97 @@ def handle_device_status_update(
         return context.res.json(
             {"success": False, "error": f"Error during device status update: {str(e)}"},
             500,
+        )
+
+
+def handle_refresh_ip(context, databases, database_id, device_id, ip_address, port):
+    """Handle IP address refresh from ESP32 mDNS discovery"""
+    try:
+        # Update device document with new IP and port
+        try:
+            device_response = databases.list_documents(
+                database_id=database_id,
+                collection_id="devices",
+                queries=[Query.equal("device_id", device_id)],
+            )
+
+            device_documents = _doclist_documents(device_response)
+            if not device_documents:
+                return context.res.json(
+                    {
+                        "success": False,
+                        "error": f"Device with device_id {device_id} not found",
+                    },
+                    404,
+                )
+
+            device_doc = device_documents[0]
+            old_ip = device_doc.get("ip_address")
+            old_port = device_doc.get("port")
+
+            # Only update if IP or port actually changed
+            if old_ip == ip_address and old_port == str(port):
+                return context.res.json(
+                    {
+                        "success": True,
+                        "message": f"IP unchanged for device {device_id}",
+                        "ip_changed": False,
+                    }
+                )
+
+            databases.update_document(
+                database_id=database_id,
+                collection_id="devices",
+                document_id=device_doc["$id"],
+                data={"ip_address": ip_address, "port": str(port)},
+            )
+
+        except AppwriteException as e:
+            ntfy_alert(f"[device-handler] refresh_ip failed for {device_id}: {e}")
+            return context.res.json(
+                {"success": False, "error": f"Error updating device: {str(e)}"}, 500
+            )
+
+        # Update all notifications for this device with new IP and port
+        updated_notifications = 0
+        try:
+            notifications_response = databases.list_documents(
+                database_id=database_id,
+                collection_id="notifications",
+                queries=[Query.equal("device_id", device_id)],
+            )
+
+            for document in _doclist_documents(notifications_response):
+                databases.update_document(
+                    database_id=database_id,
+                    collection_id="notifications",
+                    document_id=document["$id"],
+                    data={"ip_address": ip_address, "port": str(port)},
+                )
+                updated_notifications += 1
+
+        except AppwriteException:
+            pass  # Continue even if notification update fails
+
+        ntfy_alert(
+            f"[device-handler] IP refreshed for {device_id}: {old_ip} -> {ip_address}",
+            topic="projectbilal-events",
+        )
+        return context.res.json(
+            {
+                "success": True,
+                "message": f"IP refreshed for device {device_id}",
+                "ip_changed": True,
+                "old_ip": old_ip,
+                "new_ip": ip_address,
+                "notifications_updated": updated_notifications,
+            }
+        )
+
+    except Exception as e:
+        ntfy_alert(f"[device-handler] refresh_ip failed for {device_id}: {e}")
+        return context.res.json(
+            {"success": False, "error": f"Error during IP refresh: {str(e)}"}, 500
         )
 
 

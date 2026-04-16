@@ -7,7 +7,9 @@ import json
 import requests
 import time
 import urllib.request
+import threading
 import pytz
+import paho.mqtt.client as mqtt
 from collections import defaultdict
 from typing import Dict, Any
 from .praytime import PrayTime
@@ -220,6 +222,86 @@ def delete_existing_notifications(databases, device_ids):
             )
     except Exception as e:
         pass  # Silently continue if deletion fails
+
+
+def send_ip_refresh_messages(devices, context):
+    """Send MQTT refresh_ip messages to devices where it's 3 AM local time."""
+    devices_to_refresh = []
+
+    utc_now = datetime.now(timezone.utc)
+
+    for device in devices:
+        device_timezone = device.get("timezone")
+        speaker_name = device.get("speaker_name")
+        device_id = device.get("device_id")
+
+        if not device_timezone or not speaker_name:
+            continue
+
+        try:
+            local_time = utc_now.astimezone(pytz.timezone(device_timezone))
+            if local_time.hour == 3:
+                devices_to_refresh.append(device)
+                context.log(
+                    f"Device {device_id} is at 3 AM local ({device_timezone}), queuing IP refresh"
+                )
+        except Exception as e:
+            context.error(f"Timezone error for device {device_id}: {e}")
+
+    if not devices_to_refresh:
+        return
+
+    broker_host = os.environ.get("MQTT_BROKER_HOST")
+    broker_port_str = os.environ.get("MQTT_BROKER_PORT")
+    if not broker_host or not broker_port_str:
+        context.error("MQTT broker env vars not set, skipping IP refresh")
+        return
+
+    try:
+        mqtt_client = mqtt.Client(
+            client_id=f"bilal_refresh_{int(time.time())}"
+        )
+
+        connected_event = threading.Event()
+
+        def on_connect(client, userdata, flags, rc):
+            if rc == 0:
+                connected_event.set()
+
+        mqtt_client.on_connect = on_connect
+        mqtt_client.connect(broker_host, int(broker_port_str), 60)
+        mqtt_client.loop_start()
+
+        if not connected_event.wait(timeout=10):
+            context.error("MQTT connection timeout for IP refresh")
+            return
+
+        for device in devices_to_refresh:
+            device_id = device.get("device_id")
+            speaker_name = device.get("speaker_name")
+            topic = f"projectbilal/{device_id}"
+            message = json.dumps({
+                "action": "refresh_ip",
+                "props": {
+                    "speaker_name": speaker_name,
+                    "appwrite_key": os.environ.get("APPWRITE_API_KEY", ""),
+                },
+            })
+            result = mqtt_client.publish(topic, message, qos=1)
+            result.wait_for_publish()
+            context.log(f"Sent refresh_ip to {device_id} for speaker '{speaker_name}'")
+
+        mqtt_client.loop_stop()
+        mqtt_client.disconnect()
+
+        ntfy_alert(
+            f"[schedule-notifications] Sent IP refresh to {len(devices_to_refresh)} device(s)",
+            topic="projectbilal-events",
+        )
+
+    except Exception as e:
+        context.error(f"Failed to send IP refresh messages: {e}")
+        ntfy_alert(f"[schedule-notifications] IP refresh MQTT failed: {e}")
 
 
 def calculate_prayer_times(
@@ -511,7 +593,8 @@ def main(context):
             )
             all_notifications.extend(notifications)
 
-        pass
+        # Send IP refresh MQTT messages to devices where it's 3 AM local time
+        send_ip_refresh_messages(devices, context)
 
         if all_notifications:
             # Get unique device IDs from notifications
