@@ -54,6 +54,29 @@ def _doclist_documents(doclist):
         raw = []
     return [_document_to_plain_dict(d) for d in raw]
 
+def _list_all_documents(databases, database_id, collection_id, queries=None):
+    """Fetch all documents, paginating through Appwrite's 25-doc default limit."""
+    all_docs = []
+    limit = 100
+    offset = 0
+    while True:
+        q = list(queries or [])
+        q.append(Query.limit(limit))
+        q.append(Query.offset(offset))
+        result = _retry_appwrite(
+            databases.list_documents,
+            database_id=database_id,
+            collection_id=collection_id,
+            queries=q,
+        )
+        docs = _doclist_documents(result)
+        all_docs.extend(docs)
+        if len(docs) < limit:
+            break
+        offset += limit
+    return all_docs
+
+
 # Configuration for prayer calculation
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 GOOGLE_TIMEZONE_BASE_URL = "https://maps.googleapis.com/maps/api/timezone/json"
@@ -184,13 +207,11 @@ def init_appwrite_client(context):
 
 def fetch_enabled_devices(databases):
     """Fetch all enabled devices."""
-    return _doclist_documents(
-        _retry_appwrite(
-            databases.list_documents,
-            database_id="projectbilal",
-            collection_id="devices",
-            queries=[Query.equal("enabled", True)],
-        )
+    return _list_all_documents(
+        databases,
+        database_id="projectbilal",
+        collection_id="devices",
+        queries=[Query.equal("enabled", True)],
     )
 
 
@@ -236,17 +257,25 @@ def build_device_object(device, timings):
 
 
 def delete_existing_notifications(databases, device_ids):
-    """Delete all existing notifications for the given device IDs."""
-    try:
-        # Delete notifications for each device
-        for device_id in device_ids:
-            databases.delete_documents(
+    """Delete all existing notifications for the given device IDs.
+    Returns list of device_ids that failed deletion (should be excluded from upsert)."""
+    failed_ids = []
+    for device_id in device_ids:
+        try:
+            _retry_appwrite(
+                databases.delete_documents,
                 database_id="projectbilal",
                 collection_id="notifications",
                 queries=[Query.equal("device_id", device_id)],
             )
-    except Exception as e:
-        pass  # Silently continue if deletion fails
+        except Exception as e:
+            failed_ids.append(device_id)
+            ntfy_alert(
+                f"[schedule-notifications] Failed to delete notifications for {device_id}: {e}",
+                priority=4,
+                tags="warning",
+            )
+    return failed_ids
 
 
 def send_ip_refresh_messages(devices, context):
@@ -555,41 +584,34 @@ def main(context):
 
         if target_device_id:
             # Process only the specified device
-            devices = _doclist_documents(
-                _retry_appwrite(
-                    databases.list_documents,
-                    database_id="projectbilal",
-                    collection_id="devices",
-                    queries=[
-                        Query.equal("enabled", True),
-                        Query.equal("device_id", target_device_id),
-                    ],
-                )
+            devices = _list_all_documents(
+                databases,
+                database_id="projectbilal",
+                collection_id="devices",
+                queries=[
+                    Query.equal("enabled", True),
+                    Query.equal("device_id", target_device_id),
+                ],
             )
 
             # Fetch all timings for this specific device (enabled and disabled)
-            timings = _doclist_documents(
-                _retry_appwrite(
-                    databases.list_documents,
-                    database_id="projectbilal",
-                    collection_id="timings",
-                    queries=[
-                        Query.equal("device_id", target_device_id),
-                    ],
-                )
+            timings = _list_all_documents(
+                databases,
+                database_id="projectbilal",
+                collection_id="timings",
+                queries=[
+                    Query.equal("device_id", target_device_id),
+                ],
             )
         else:
             # Process all devices (current behavior)
             devices = fetch_enabled_devices(databases)
             # Fetch all timings (enabled and disabled)
-            timings = _doclist_documents(
-                _retry_appwrite(
-                    databases.list_documents,
-                    database_id="projectbilal",
-                    collection_id="timings",
-                )
+            timings = _list_all_documents(
+                databases,
+                database_id="projectbilal",
+                collection_id="timings",
             )
-        pass
 
         # Group timings by device_id
         timings_by_device = group_timings_by_device(timings)
@@ -632,7 +654,13 @@ def main(context):
             )
 
             # Delete existing notifications for these devices
-            delete_existing_notifications(databases, device_ids)
+            failed_ids = delete_existing_notifications(databases, device_ids)
+
+            # Exclude devices whose old notifications couldn't be deleted (prevent duplicates)
+            if failed_ids:
+                all_notifications = [
+                    n for n in all_notifications if n["device_id"] not in failed_ids
+                ]
 
             try:
                 _retry_appwrite(
@@ -642,7 +670,7 @@ def main(context):
                     documents=all_notifications,
                 )
                 ntfy_alert(
-                    f"[schedule-notifications] Scheduled {len(all_notifications)} notifications for {len(device_ids)} devices",
+                    f"[schedule-notifications] Scheduled {len(all_notifications)} notifications for {len(device_ids) - len(failed_ids)} devices",
                     topic="projectbilal-events",
                     priority=2,
                     tags="calendar",

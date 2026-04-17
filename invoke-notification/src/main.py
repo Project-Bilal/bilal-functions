@@ -2,6 +2,7 @@ import paho.mqtt.client as mqtt
 import json
 import os
 import time
+import threading
 import urllib.request
 
 NTFY_BASE = os.environ.get("NTFY_BASE_URL", "http://34.53.103.114")
@@ -56,10 +57,6 @@ def send_mqtt_message(topic, message, broker=None, port=None):
     """
     Send a message to the MQTT broker
     """
-    import time
-    import threading
-    import os
-
     # Use environment variables for broker configuration
     if broker is None:
         broker = os.environ.get("MQTT_BROKER_HOST")

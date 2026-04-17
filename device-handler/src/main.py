@@ -4,6 +4,7 @@ from appwrite.exception import AppwriteException
 from appwrite.query import Query
 import json
 import os
+import time
 import urllib.request
 
 NTFY_BASE = os.environ.get("NTFY_BASE_URL", "http://34.53.103.114")
@@ -45,6 +46,48 @@ def _doclist_documents(doclist):
     else:
         raw = []
     return [_document_to_plain_dict(d) for d in raw]
+
+
+def _retry_appwrite(fn, *args, max_attempts=3, **kwargs):
+    """Retry an Appwrite SDK call on transient errors (503, connection reset, SSL)."""
+    delays = [1, 2]
+    for attempt in range(max_attempts):
+        try:
+            return fn(*args, **kwargs)
+        except Exception as e:
+            err_str = str(e).lower()
+            is_transient = any(marker in err_str for marker in [
+                "503", "connection reset", "ssl", "first byte timeout", "unexpected eof",
+            ])
+            if isinstance(e, KeyError) and "content-type" in err_str:
+                is_transient = True
+            if is_transient and attempt < max_attempts - 1:
+                time.sleep(delays[attempt])
+                continue
+            raise
+
+
+def _list_all_documents(databases, database_id, collection_id, queries=None):
+    """Fetch all documents, paginating through Appwrite's 25-doc default limit."""
+    all_docs = []
+    limit = 100
+    offset = 0
+    while True:
+        q = list(queries or [])
+        q.append(Query.limit(limit))
+        q.append(Query.offset(offset))
+        result = _retry_appwrite(
+            databases.list_documents,
+            database_id=database_id,
+            collection_id=collection_id,
+            queries=q,
+        )
+        docs = _doclist_documents(result)
+        all_docs.extend(docs)
+        if len(docs) < limit:
+            break
+        offset += limit
+    return all_docs
 
 
 def main(context):
@@ -143,58 +186,43 @@ def handle_device_deletion(context, databases, database_id, device_id):
     """Handle device deletion operation"""
     device_name = device_id  # Fallback to MAC if name not found
     try:
-        # Delete documents from timings collection where device_id matches
+        # Batch delete timings for this device
         try:
-            timings_response = databases.list_documents(
+            _retry_appwrite(
+                databases.delete_documents,
                 database_id=database_id,
                 collection_id="timings",
                 queries=[Query.equal("device_id", device_id)],
             )
+        except Exception:
+            pass  # Continue with other operations
 
-            for document in _doclist_documents(timings_response):
-                databases.delete_document(
-                    database_id=database_id,
-                    collection_id="timings",
-                    document_id=document["$id"],
-                )
-        except AppwriteException as e:
-            # Log error but continue with other operations
-            pass
-
-        # Delete documents from notifications collection where device_id matches
+        # Batch delete notifications for this device
         try:
-            notifications_response = databases.list_documents(
+            _retry_appwrite(
+                databases.delete_documents,
                 database_id=database_id,
                 collection_id="notifications",
                 queries=[Query.equal("device_id", device_id)],
             )
-
-            for document in _doclist_documents(notifications_response):
-                databases.delete_document(
-                    database_id=database_id,
-                    collection_id="notifications",
-                    document_id=document["$id"],
-                )
-        except AppwriteException as e:
-            # Log error but continue with other operations
-            pass
+        except Exception:
+            pass  # Continue with other operations
 
         # Update the device document (don't delete, just update fields)
         try:
-            # First, find the device document
-            device_response = databases.list_documents(
+            device_documents = _list_all_documents(
+                databases,
                 database_id=database_id,
                 collection_id="devices",
                 queries=[Query.equal("device_id", device_id)],
             )
-
-            device_documents = _doclist_documents(device_response)
             if device_documents:
                 device_doc = device_documents[0]
                 device_name = device_doc.get("name", device_id)
 
                 # Update the device document with the specified values
-                databases.update_document(
+                _retry_appwrite(
+                    databases.update_document,
                     database_id=database_id,
                     collection_id="devices",
                     document_id=device_doc["$id"],
@@ -279,17 +307,14 @@ def handle_device_onboarding(
         # Check if device already exists
         try:
             context.log(f"Checking if device {device_id} already exists in database")
-            device_response = databases.list_documents(
+            device_documents = _list_all_documents(
+                databases,
                 database_id=database_id,
                 collection_id="devices",
                 queries=[Query.equal("device_id", device_id)],
             )
-            context.log(f"list_documents response type: {type(device_response).__name__}")
-            context.log(
-                f"Found {len(_doclist_documents(device_response))} existing device(s)"
-            )
+            context.log(f"Found {len(device_documents)} existing device(s)")
 
-            device_documents = _doclist_documents(device_response)
             if device_documents:
                 # Device exists, allow re-claiming by any user
                 # Physical access (BLE connection + factory reset) = ownership rights
@@ -307,7 +332,8 @@ def handle_device_onboarding(
                 new_status = "online" if current_status == "online" else "pending"
                 context.log(f"Status transition: {current_status} -> {new_status}")
 
-                databases.update_document(
+                _retry_appwrite(
+                    databases.update_document,
                     database_id=database_id,
                     collection_id="devices",
                     document_id=device_doc["$id"],
@@ -330,7 +356,8 @@ def handle_device_onboarding(
                 # Device doesn't exist, create it
                 context.log(f"Device doesn't exist - creating new device document")
                 # New devices start as "pending" since they haven't connected yet
-                databases.create_document(
+                _retry_appwrite(
+                    databases.create_document,
                     database_id=database_id,
                     collection_id="devices",
                     document_id=device_id,
@@ -370,7 +397,8 @@ def handle_device_onboarding(
         for prayer_name in prayer_names:
             try:
                 timing_doc_id = f"{device_id}_{prayer_name.lower()}"
-                databases.delete_document(
+                _retry_appwrite(
+                    databases.delete_document,
                     database_id=database_id,
                     collection_id="timings",
                     document_id=timing_doc_id,
@@ -392,7 +420,8 @@ def handle_device_onboarding(
             try:
                 for prayer_name in prayer_names:
                     timing_doc_id = f"{device_id}_{prayer_name.lower()}"
-                    databases.create_document(
+                    _retry_appwrite(
+                        databases.create_document,
                         database_id=database_id,
                         collection_id="timings",
                         document_id=timing_doc_id,
@@ -482,16 +511,16 @@ def handle_device_status_update(
 
         # Update the device document
         try:
-            device_response = databases.list_documents(
+            device_documents = _list_all_documents(
+                databases,
                 database_id=database_id,
                 collection_id="devices",
                 queries=[Query.equal("device_id", device_id)],
             )
-
-            device_documents = _doclist_documents(device_response)
             if device_documents:
                 device_doc = device_documents[0]
-                databases.update_document(
+                _retry_appwrite(
+                    databases.update_document,
                     database_id=database_id,
                     collection_id="devices",
                     document_id=device_doc["$id"],
@@ -536,13 +565,12 @@ def handle_refresh_ip(context, databases, database_id, device_id, ip_address, po
     try:
         # Update device document with new IP and port
         try:
-            device_response = databases.list_documents(
+            device_documents = _list_all_documents(
+                databases,
                 database_id=database_id,
                 collection_id="devices",
                 queries=[Query.equal("device_id", device_id)],
             )
-
-            device_documents = _doclist_documents(device_response)
             if not device_documents:
                 return context.res.json(
                     {
@@ -558,7 +586,7 @@ def handle_refresh_ip(context, databases, database_id, device_id, ip_address, po
             old_port = device_doc.get("port")
 
             # Only update if IP or port actually changed
-            if old_ip == ip_address and old_port == str(port):
+            if old_ip == ip_address and old_port == (str(port) if port is not None else None):
                 return context.res.json(
                     {
                         "success": True,
@@ -567,11 +595,12 @@ def handle_refresh_ip(context, databases, database_id, device_id, ip_address, po
                     }
                 )
 
-            databases.update_document(
+            _retry_appwrite(
+                databases.update_document,
                 database_id=database_id,
                 collection_id="devices",
                 document_id=device_doc["$id"],
-                data={"ip_address": ip_address, "port": str(port)},
+                data={"ip_address": ip_address, "port": str(port) if port is not None else None},
             )
 
         except AppwriteException as e:
@@ -583,18 +612,20 @@ def handle_refresh_ip(context, databases, database_id, device_id, ip_address, po
         # Update all notifications for this device with new IP and port
         updated_notifications = 0
         try:
-            notifications_response = databases.list_documents(
+            notification_documents = _list_all_documents(
+                databases,
                 database_id=database_id,
                 collection_id="notifications",
                 queries=[Query.equal("device_id", device_id)],
             )
 
-            for document in _doclist_documents(notifications_response):
-                databases.update_document(
+            for document in notification_documents:
+                _retry_appwrite(
+                    databases.update_document,
                     database_id=database_id,
                     collection_id="notifications",
                     document_id=document["$id"],
-                    data={"ip_address": ip_address, "port": str(port)},
+                    data={"ip_address": ip_address, "port": str(port) if port is not None else None},
                 )
                 updated_notifications += 1
 
@@ -628,43 +659,34 @@ def handle_refresh_ip(context, databases, database_id, device_id, ip_address, po
 def handle_device_disable_with_cleanup(context, databases, database_id, device_id):
     """Handle device disable with notification cleanup"""
     try:
-        # Delete notifications for this device
+        # Batch delete notifications for this device
         try:
-            notifications_response = databases.list_documents(
+            _retry_appwrite(
+                databases.delete_documents,
                 database_id=database_id,
                 collection_id="notifications",
                 queries=[Query.equal("device_id", device_id)],
             )
-
-            for document in _doclist_documents(notifications_response):
-                databases.delete_document(
-                    database_id=database_id,
-                    collection_id="notifications",
-                    document_id=document["$id"],
-                )
-            pass
-        except AppwriteException as e:
-            # Log error but continue with device update
-            pass
+        except Exception:
+            pass  # Continue with device update
 
         # Set device to disabled
         try:
-            device_response = databases.list_documents(
+            device_documents = _list_all_documents(
+                databases,
                 database_id=database_id,
                 collection_id="devices",
                 queries=[Query.equal("device_id", device_id)],
             )
-
-            device_documents = _doclist_documents(device_response)
             if device_documents:
                 device_doc = device_documents[0]
-                databases.update_document(
+                _retry_appwrite(
+                    databases.update_document,
                     database_id=database_id,
                     collection_id="devices",
                     document_id=device_doc["$id"],
                     data={"enabled": False},
                 )
-                pass
             else:
                 return context.res.json(
                     {

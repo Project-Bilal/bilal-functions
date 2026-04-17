@@ -77,76 +77,6 @@ def _retry_appwrite(fn, *args, max_attempts=3, **kwargs):
             raise
 
 
-def send_mqtt_message(topic, message, broker=None, port=None):
-    """
-    Send a message to the MQTT broker
-    """
-    # Use environment variables for broker configuration
-    if broker is None:
-        broker = os.environ.get("MQTT_BROKER_HOST")
-        if not broker:
-            raise Exception("MQTT_BROKER_HOST environment variable is required")
-    if port is None:
-        port_str = os.environ.get("MQTT_BROKER_PORT")
-        if not port_str:
-            raise Exception("MQTT_BROKER_PORT environment variable is required")
-        port = int(port_str)
-
-    # Use threading events to track connection status
-    connected_event = threading.Event()
-    connection_error = None
-
-    def on_connect(client, userdata, flags, rc):
-        if rc == 0:
-            connected_event.set()
-        else:
-            nonlocal connection_error
-            connection_error = f"Connection failed with code {rc}"
-            connected_event.set()
-
-    def on_disconnect(client, userdata, rc):
-        pass
-
-    try:
-        # Create MQTT client with a unique client ID
-        client = mqtt.Client(client_id=f"bilal_checker_{hash(topic)}")
-
-        # Set up callbacks
-        client.on_connect = on_connect
-        client.on_disconnect = on_disconnect
-
-        # Set connection timeout
-        client.connect(broker, port, 60)
-
-        # Start the loop to handle the connection
-        client.loop_start()
-
-        # Wait for connection to be established with 10-second timeout
-        max_wait_time = 10  # seconds
-
-        if not connected_event.wait(timeout=max_wait_time):
-            raise Exception(
-                f"Failed to connect to MQTT broker within {max_wait_time} seconds"
-            )
-
-        if connection_error:
-            raise Exception(connection_error)
-
-        # Publish message with QoS 1 for broker delivery assurance
-        result = client.publish(topic, message, qos=1)
-
-        # Wait for the message to be sent
-        result.wait_for_publish()
-
-        # Stop the loop and disconnect
-        client.loop_stop()
-        client.disconnect()
-
-        return True, "Message sent successfully"
-    except Exception as e:
-        return False, f"Failed to send message: {str(e)}"
-
-
 # This Appwrite function will be executed every time your function is triggered
 def main(context):
     current_time = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M")
@@ -170,6 +100,7 @@ def main(context):
             queries=[
                 Query.equal("timestampUTC", current_time),
                 Query.equal("enabled", True),
+                Query.limit(100),
             ],
         )
         notifications_total = _doclist_total(notifications)
