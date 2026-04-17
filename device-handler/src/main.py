@@ -9,11 +9,15 @@ import urllib.request
 NTFY_BASE = os.environ.get("NTFY_BASE_URL", "http://34.53.103.114")
 
 
-def ntfy_alert(message: str, topic: str = "projectbilal-errors", title: str = "Project Bilal"):
+def ntfy_alert(message: str, topic: str = "projectbilal-errors", title: str = "Project Bilal", priority: int = None, tags: str = None):
     url = f"{NTFY_BASE}/{topic}"
     try:
         req = urllib.request.Request(url, data=message.encode(), method="POST")
         req.add_header("Title", title)
+        if priority:
+            req.add_header("Priority", str(priority))
+        if tags:
+            req.add_header("Tags", tags)
         urllib.request.urlopen(req, timeout=5)
     except Exception:
         pass  # Never break main flow
@@ -129,7 +133,7 @@ def main(context):
             )
 
     except Exception as e:
-        ntfy_alert(f"[device-handler] Unhandled error: {e}")
+        ntfy_alert(f"[device-handler] Unhandled error: {e}", priority=4, tags="warning")
         return context.res.json(
             {"success": False, "error": f"Unexpected error: {str(e)}"}, 500
         )
@@ -137,6 +141,7 @@ def main(context):
 
 def handle_device_deletion(context, databases, database_id, device_id):
     """Handle device deletion operation"""
+    device_name = device_id  # Fallback to MAC if name not found
     try:
         # Delete documents from timings collection where device_id matches
         try:
@@ -186,6 +191,7 @@ def handle_device_deletion(context, databases, database_id, device_id):
             device_documents = _doclist_documents(device_response)
             if device_documents:
                 device_doc = device_documents[0]
+                device_name = device_doc.get("name", device_id)
 
                 # Update the device document with the specified values
                 databases.update_document(
@@ -218,14 +224,16 @@ def handle_device_deletion(context, databases, database_id, device_id):
                 )
 
         except AppwriteException as e:
-            ntfy_alert(f"[device-handler] Delete failed for {device_id}: {e}")
+            ntfy_alert(f"[device-handler] Delete failed for {device_id}: {e}", priority=4, tags="warning")
             return context.res.json(
                 {"success": False, "error": f"Error updating device: {str(e)}"}, 500
             )
 
         ntfy_alert(
-            f"[device-handler] Device {device_id} removed",
+            f'[device-handler] Device "{device_name}" ({device_id}) removed',
             topic="projectbilal-events",
+            priority=2,
+            tags="wastebasket",
         )
         return context.res.json(
             {
@@ -238,7 +246,7 @@ def handle_device_deletion(context, databases, database_id, device_id):
         )
 
     except Exception as e:
-        ntfy_alert(f"[device-handler] Delete failed for {device_id}: {e}")
+        ntfy_alert(f"[device-handler] Delete failed for {device_id}: {e}", priority=4, tags="warning")
         return context.res.json(
             {"success": False, "error": f"Error during device deletion: {str(e)}"}, 500
         )
@@ -344,7 +352,7 @@ def handle_device_onboarding(
                 )
 
         except AppwriteException as e:
-            ntfy_alert(f"[device-handler] Onboarding failed for {device_id}: {e}")
+            ntfy_alert(f"[device-handler] Onboarding failed for {device_id}: {e}", priority=4, tags="warning")
             return context.res.json(
                 {
                     "success": False,
@@ -418,8 +426,10 @@ def handle_device_onboarding(
         context.log(f"Timings created: {timings_created}")
 
         ntfy_alert(
-            f"[device-handler] Device {device_id} onboarded",
+            f"[device-handler] Device \"{device_name}\" ({device_id}) onboarded",
             topic="projectbilal-events",
+            priority=2,
+            tags="electric_plug",
         )
         response_data = {
             "success": True,
@@ -444,7 +454,7 @@ def handle_device_onboarding(
         import traceback
 
         context.error(f"Traceback: {traceback.format_exc()}")
-        ntfy_alert(f"[device-handler] Onboarding failed for {device_id}: {e}")
+        ntfy_alert(f"[device-handler] Onboarding failed for {device_id}: {e}", priority=4, tags="warning")
 
         return context.res.json(
             {"success": False, "error": f"Error during device onboarding: {str(e)}"},
@@ -543,6 +553,7 @@ def handle_refresh_ip(context, databases, database_id, device_id, ip_address, po
                 )
 
             device_doc = device_documents[0]
+            device_name = device_doc.get("name", device_id)
             old_ip = device_doc.get("ip_address")
             old_port = device_doc.get("port")
 
@@ -564,7 +575,7 @@ def handle_refresh_ip(context, databases, database_id, device_id, ip_address, po
             )
 
         except AppwriteException as e:
-            ntfy_alert(f"[device-handler] refresh_ip failed for {device_id}: {e}")
+            ntfy_alert(f"[device-handler] refresh_ip failed for {device_id}: {e}", priority=4, tags="warning")
             return context.res.json(
                 {"success": False, "error": f"Error updating device: {str(e)}"}, 500
             )
@@ -591,8 +602,10 @@ def handle_refresh_ip(context, databases, database_id, device_id, ip_address, po
             pass  # Continue even if notification update fails
 
         ntfy_alert(
-            f"[device-handler] IP refreshed for {device_id}: {old_ip} -> {ip_address}",
+            f'[device-handler] IP refreshed for "{device_name}" ({device_id}): {old_ip} -> {ip_address}',
             topic="projectbilal-events",
+            priority=2,
+            tags="arrows_counterclockwise",
         )
         return context.res.json(
             {
@@ -606,7 +619,7 @@ def handle_refresh_ip(context, databases, database_id, device_id, ip_address, po
         )
 
     except Exception as e:
-        ntfy_alert(f"[device-handler] refresh_ip failed for {device_id}: {e}")
+        ntfy_alert(f"[device-handler] refresh_ip failed for {device_id}: {e}", priority=4, tags="warning")
         return context.res.json(
             {"success": False, "error": f"Error during IP refresh: {str(e)}"}, 500
         )

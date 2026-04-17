@@ -17,11 +17,15 @@ from .praytime import PrayTime
 NTFY_BASE = os.environ.get("NTFY_BASE_URL", "http://34.53.103.114")
 
 
-def ntfy_alert(message: str, topic: str = "projectbilal-errors", title: str = "Project Bilal"):
+def ntfy_alert(message: str, topic: str = "projectbilal-errors", title: str = "Project Bilal", priority: int = None, tags: str = None):
     url = f"{NTFY_BASE}/{topic}"
     try:
         req = urllib.request.Request(url, data=message.encode(), method="POST")
         req.add_header("Title", title)
+        if priority:
+            req.add_header("Priority", str(priority))
+        if tags:
+            req.add_header("Tags", tags)
         urllib.request.urlopen(req, timeout=5)
     except Exception:
         pass  # Never break main flow
@@ -234,6 +238,7 @@ def send_ip_refresh_messages(devices, context):
         device_timezone = device.get("timezone")
         speaker_name = device.get("speaker_name")
         device_id = device.get("device_id")
+        device_name = device.get("name", device_id)
 
         if not device_timezone or not speaker_name:
             continue
@@ -243,7 +248,7 @@ def send_ip_refresh_messages(devices, context):
             if local_time.hour == 3:
                 devices_to_refresh.append(device)
                 context.log(
-                    f"Device {device_id} is at 3 AM local ({device_timezone}), queuing IP refresh"
+                    f'Device "{device_name}" ({device_id}) is at 3 AM local ({device_timezone}), queuing IP refresh'
                 )
         except Exception as e:
             context.error(f"Timezone error for device {device_id}: {e}")
@@ -279,6 +284,7 @@ def send_ip_refresh_messages(devices, context):
         for device in devices_to_refresh:
             device_id = device.get("device_id")
             speaker_name = device.get("speaker_name")
+            device_name = device.get("name", device_id)
             topic = f"projectbilal/{device_id}"
             message = json.dumps({
                 "action": "refresh_ip",
@@ -286,7 +292,7 @@ def send_ip_refresh_messages(devices, context):
             })
             result = mqtt_client.publish(topic, message, qos=1)
             result.wait_for_publish()
-            context.log(f"Sent refresh_ip to {device_id} for speaker '{speaker_name}'")
+            context.log(f'Sent refresh_ip to "{device_name}" ({device_id}) for speaker \'{speaker_name}\'')
 
         mqtt_client.loop_stop()
         mqtt_client.disconnect()
@@ -294,11 +300,13 @@ def send_ip_refresh_messages(devices, context):
         ntfy_alert(
             f"[schedule-notifications] Sent IP refresh to {len(devices_to_refresh)} device(s)",
             topic="projectbilal-events",
+            priority=2,
+            tags="arrows_counterclockwise",
         )
 
     except Exception as e:
         context.error(f"Failed to send IP refresh messages: {e}")
-        ntfy_alert(f"[schedule-notifications] IP refresh MQTT failed: {e}")
+        ntfy_alert(f"[schedule-notifications] IP refresh MQTT failed: {e}", priority=4, tags="warning")
 
 
 def calculate_prayer_times(
@@ -611,10 +619,12 @@ def main(context):
                 ntfy_alert(
                     f"[schedule-notifications] Scheduled {len(all_notifications)} notifications for {len(device_ids)} devices",
                     topic="projectbilal-events",
+                    priority=2,
+                    tags="calendar",
                 )
             except Exception as e:
                 context.error(f"Failed to upsert notifications: {str(e)}")
-                ntfy_alert(f"[schedule-notifications] Failed to upsert: {e}")
+                ntfy_alert(f"[schedule-notifications] Failed to upsert: {e}", priority=4, tags="warning")
 
         return context.res.json(
             {
@@ -626,5 +636,5 @@ def main(context):
 
     except Exception as e:
         context.error(f"Unhandled error: {str(e)}")
-        ntfy_alert(f"[schedule-notifications] Unhandled error: {e}")
+        ntfy_alert(f"[schedule-notifications] Unhandled error: {e}", priority=4, tags="warning")
         return context.res.json({"success": False, "error": str(e)}, 500)

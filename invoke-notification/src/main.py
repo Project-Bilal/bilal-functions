@@ -7,11 +7,15 @@ import urllib.request
 NTFY_BASE = os.environ.get("NTFY_BASE_URL", "http://34.53.103.114")
 
 
-def ntfy_alert(message: str, topic: str = "projectbilal-errors", title: str = "Project Bilal"):
+def ntfy_alert(message: str, topic: str = "projectbilal-errors", title: str = "Project Bilal", priority: int = None, tags: str = None):
     url = f"{NTFY_BASE}/{topic}"
     try:
         req = urllib.request.Request(url, data=message.encode(), method="POST")
         req.add_header("Title", title)
+        if priority:
+            req.add_header("Priority", str(priority))
+        if tags:
+            req.add_header("Tags", tags)
         urllib.request.urlopen(req, timeout=5)
     except Exception:
         pass  # Never break main flow
@@ -167,6 +171,8 @@ def main(context):
                 ntfy_alert(
                     f"[invoke-notification] BLE action sent to {ble_address}",
                     topic="projectbilal-events",
+                    priority=2,
+                    tags="electric_plug",
                 )
                 return context.res.json(
                     {
@@ -182,6 +188,8 @@ def main(context):
             else:
                 ntfy_alert(
                     f"[invoke-notification] BLE MQTT failed for {ble_address}: {result_message}",
+                    priority=4,
+                    tags="warning",
                 )
                 return context.res.json(
                     {
@@ -244,6 +252,8 @@ def main(context):
                 ntfy_alert(
                     f"[invoke-notification] Play sent to {device_id} (manual test)",
                     topic="projectbilal-events",
+                    priority=2,
+                    tags="speaker",
                 )
                 return context.res.json(
                     {
@@ -259,6 +269,8 @@ def main(context):
             else:
                 ntfy_alert(
                     f"[invoke-notification] Play MQTT failed for {device_id}: {result_message}",
+                    priority=4,
+                    tags="warning",
                 )
                 return context.res.json(
                     {
@@ -290,7 +302,7 @@ def main(context):
             {"success": False, "error": "Invalid JSON in request body"}, 400
         )
     except Exception as e:
-        ntfy_alert(f"[invoke-notification] Unhandled error: {e}")
+        ntfy_alert(f"[invoke-notification] Unhandled error: {e}", priority=4, tags="warning")
         return context.res.json(
             {"success": False, "error": str(e)}, 500
         )

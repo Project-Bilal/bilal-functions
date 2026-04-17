@@ -12,11 +12,15 @@ import threading
 NTFY_BASE = os.environ.get("NTFY_BASE_URL", "http://34.53.103.114")
 
 
-def ntfy_alert(message: str, topic: str = "projectbilal-errors", title: str = "Project Bilal"):
+def ntfy_alert(message: str, topic: str = "projectbilal-errors", title: str = "Project Bilal", priority: int = None, tags: str = None):
     url = f"{NTFY_BASE}/{topic}"
     try:
         req = urllib.request.Request(url, data=message.encode(), method="POST")
         req.add_header("Title", title)
+        if priority:
+            req.add_header("Priority", str(priority))
+        if tags:
+            req.add_header("Tags", tags)
         urllib.request.urlopen(req, timeout=5)
     except Exception:
         pass  # Never break main flow
@@ -267,12 +271,16 @@ def main(context):
                             ntfy_alert(
                                 f"[notification-checker] Sent play to {notification_data['device_id']}: {label}",
                                 topic="projectbilal-events",
+                                priority=2,
+                                tags="speaker",
                             )
 
                         except Exception as e:
                             context.error(f"Failed to send notification: {str(e)}")
                             ntfy_alert(
                                 f"[notification-checker] Failed to send to device {notification_data.get('device_id', '?')}: {e}",
+                                priority=4,
+                                tags="warning",
                             )
 
                     # Disconnect
@@ -281,13 +289,15 @@ def main(context):
 
                 except Exception as e:
                     context.error(f"MQTT batch send failed: {str(e)}")
-                    ntfy_alert(f"[notification-checker] MQTT batch failed: {e}")
+                    ntfy_alert(f"[notification-checker] MQTT batch failed: {e}", priority=4, tags="warning")
 
             else:
                 # Notifications due but all devices offline or invalid
                 ntfy_alert(
                     f"[notification-checker] {notifications_total} notifications due, all devices offline",
                     topic="projectbilal-events",
+                    priority=3,
+                    tags="warning",
                 )
 
             return context.res.json(
@@ -307,7 +317,7 @@ def main(context):
         )
 
     except Exception as e:
-        ntfy_alert(f"[notification-checker] Unhandled error: {e}")
+        ntfy_alert(f"[notification-checker] Unhandled error: {e}", priority=4, tags="warning")
         return context.res.json(
             {"success": False, "error": str(e), "current_time": current_time}, 500
         )
