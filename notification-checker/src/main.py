@@ -58,6 +58,25 @@ def _doclist_documents(doclist):
     return [_document_to_plain_dict(d) for d in raw]
 
 
+def _retry_appwrite(fn, *args, max_attempts=3, **kwargs):
+    """Retry an Appwrite SDK call on transient errors (503, connection reset, SSL)."""
+    delays = [1, 2]
+    for attempt in range(max_attempts):
+        try:
+            return fn(*args, **kwargs)
+        except Exception as e:
+            err_str = str(e).lower()
+            is_transient = any(marker in err_str for marker in [
+                "503", "connection reset", "ssl", "first byte timeout", "unexpected eof",
+            ])
+            if isinstance(e, KeyError) and "content-type" in err_str:
+                is_transient = True
+            if is_transient and attempt < max_attempts - 1:
+                time.sleep(delays[attempt])
+                continue
+            raise
+
+
 def send_mqtt_message(topic, message, broker=None, port=None):
     """
     Send a message to the MQTT broker
@@ -144,7 +163,8 @@ def main(context):
 
     try:
         # Query for enabled notifications with timestampUTC equal to current_time
-        notifications = databases.list_documents(
+        notifications = _retry_appwrite(
+            databases.list_documents,
             database_id="projectbilal",
             collection_id="notifications",
             queries=[

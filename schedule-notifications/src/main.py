@@ -153,22 +153,43 @@ def convert_utc_to_local(utc_time_str, timezone_str):
     return local_time.strftime("%Y-%m-%dT%H:%M")
 
 
+def _retry_appwrite(fn, *args, max_attempts=3, **kwargs):
+    """Retry an Appwrite SDK call on transient errors (503, connection reset, SSL)."""
+    delays = [1, 2]
+    for attempt in range(max_attempts):
+        try:
+            return fn(*args, **kwargs)
+        except Exception as e:
+            err_str = str(e).lower()
+            is_transient = any(marker in err_str for marker in [
+                "503", "connection reset", "ssl", "first byte timeout", "unexpected eof",
+            ])
+            if isinstance(e, KeyError) and "content-type" in err_str:
+                is_transient = True
+            if is_transient and attempt < max_attempts - 1:
+                time.sleep(delays[attempt])
+                continue
+            raise
+
+
 def init_appwrite_client(context):
     """Initialize Appwrite client from environment and context."""
     return (
         Client()
         .set_project(os.environ["APPWRITE_FUNCTION_PROJECT_ID"])
         .set_key(context.req.headers["x-appwrite-key"])
+        .set_endpoint("https://fra.cloud.appwrite.io/v1")
     )
 
 
 def fetch_enabled_devices(databases):
     """Fetch all enabled devices."""
     return _doclist_documents(
-        databases.list_documents(
-        database_id="projectbilal",
-        collection_id="devices",
-        queries=[Query.equal("enabled", True)],
+        _retry_appwrite(
+            databases.list_documents,
+            database_id="projectbilal",
+            collection_id="devices",
+            queries=[Query.equal("enabled", True)],
         )
     )
 
@@ -535,24 +556,26 @@ def main(context):
         if target_device_id:
             # Process only the specified device
             devices = _doclist_documents(
-                databases.list_documents(
-                database_id="projectbilal",
-                collection_id="devices",
-                queries=[
-                    Query.equal("enabled", True),
-                    Query.equal("device_id", target_device_id),
-                ],
+                _retry_appwrite(
+                    databases.list_documents,
+                    database_id="projectbilal",
+                    collection_id="devices",
+                    queries=[
+                        Query.equal("enabled", True),
+                        Query.equal("device_id", target_device_id),
+                    ],
                 )
             )
 
             # Fetch all timings for this specific device (enabled and disabled)
             timings = _doclist_documents(
-                databases.list_documents(
-                database_id="projectbilal",
-                collection_id="timings",
-                queries=[
-                    Query.equal("device_id", target_device_id),
-                ],
+                _retry_appwrite(
+                    databases.list_documents,
+                    database_id="projectbilal",
+                    collection_id="timings",
+                    queries=[
+                        Query.equal("device_id", target_device_id),
+                    ],
                 )
             )
         else:
@@ -560,9 +583,10 @@ def main(context):
             devices = fetch_enabled_devices(databases)
             # Fetch all timings (enabled and disabled)
             timings = _doclist_documents(
-                databases.list_documents(
-                database_id="projectbilal",
-                collection_id="timings",
+                _retry_appwrite(
+                    databases.list_documents,
+                    database_id="projectbilal",
+                    collection_id="timings",
                 )
             )
         pass
@@ -611,7 +635,8 @@ def main(context):
             delete_existing_notifications(databases, device_ids)
 
             try:
-                databases.upsert_documents(
+                _retry_appwrite(
+                    databases.upsert_documents,
                     database_id="projectbilal",
                     collection_id="notifications",
                     documents=all_notifications,
