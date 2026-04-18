@@ -137,6 +137,23 @@ def main(context):
                 }
                 valid_notifications.append(notification_data)
 
+            # Look up device names for all unique device IDs
+            device_names = {}
+            unique_device_ids = set(n["device_id"] for n in valid_notifications)
+            for did in unique_device_ids:
+                try:
+                    devices = _retry_appwrite(
+                        databases.list_documents,
+                        database_id="projectbilal",
+                        collection_id="devices",
+                        queries=[Query.equal("device_id", did), Query.limit(1)],
+                    )
+                    docs = _doclist_documents(devices)
+                    if docs and docs[0].get("name"):
+                        device_names[did] = docs[0]["name"]
+                except Exception:
+                    pass  # Fall back to device_id in logs
+
             if valid_notifications:
                 # Send all notifications using single MQTT connection
 
@@ -219,8 +236,9 @@ def main(context):
                             result.wait_for_publish()
 
                             processed_count += 1
+                            device_label = device_names.get(notification_data['device_id'], notification_data['device_id'])
                             ntfy_alert(
-                                f"[notification-checker] Sent play to {notification_data['device_id']}: {label}",
+                                f"[notification-checker] Sent play to {device_label}: {label}",
                                 topic="projectbilal-events",
                                 priority=2,
                                 tags="speaker",
