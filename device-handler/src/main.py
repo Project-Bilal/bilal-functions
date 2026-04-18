@@ -472,6 +472,7 @@ def handle_device_onboarding(
         # Include API key for ESP32 provisioning when device is being claimed
         if user_id is not None:
             appwrite_key = os.environ.get("APPWRITE_API_KEY")
+            context.log(f"APPWRITE_API_KEY present: {appwrite_key is not None}")
             if appwrite_key:
                 response_data["appwrite_key"] = appwrite_key
         return context.res.json(response_data)
