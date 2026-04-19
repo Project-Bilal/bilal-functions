@@ -160,21 +160,6 @@ def main(context):
             return handle_device_disable_with_cleanup(
                 context, databases, database_id, device_id
             )
-        elif operation == "refresh_ip":
-            ip_address = request_data.get("ip_address")
-            port = request_data.get("port")
-            if not ip_address or not port:
-                return context.res.json(
-                    {
-                        "success": False,
-                        "error": "ip_address and port are required for refresh_ip",
-                    },
-                    400,
-                )
-            return handle_refresh_ip(
-                context, databases, database_id, device_id, ip_address, port
-            )
-
     except Exception as e:
         ntfy_alert(f"[device-handler] Unhandled error: {e}", priority=4, tags="warning")
         return context.res.json(
@@ -560,101 +545,6 @@ def handle_device_status_update(
             500,
         )
 
-
-def handle_refresh_ip(context, databases, database_id, device_id, ip_address, port):
-    """Handle IP address refresh from ESP32 mDNS discovery"""
-    try:
-        # Update device document with new IP and port
-        try:
-            device_documents = _list_all_documents(
-                databases,
-                database_id=database_id,
-                collection_id="devices",
-                queries=[Query.equal("device_id", device_id)],
-            )
-            if not device_documents:
-                return context.res.json(
-                    {
-                        "success": False,
-                        "error": f"Device with device_id {device_id} not found",
-                    },
-                    404,
-                )
-
-            device_doc = device_documents[0]
-            device_name = device_doc.get("name", device_id)
-            old_ip = device_doc.get("ip_address")
-            old_port = device_doc.get("port")
-
-            # Only update if IP or port actually changed
-            if old_ip == ip_address and old_port == (str(port) if port is not None else None):
-                return context.res.json(
-                    {
-                        "success": True,
-                        "message": f"IP unchanged for device {device_id}",
-                        "ip_changed": False,
-                    }
-                )
-
-            _retry_appwrite(
-                databases.update_document,
-                database_id=database_id,
-                collection_id="devices",
-                document_id=device_doc["$id"],
-                data={"ip_address": ip_address, "port": str(port) if port is not None else None},
-            )
-
-        except AppwriteException as e:
-            ntfy_alert(f"[device-handler] refresh_ip failed for {device_id}: {e}", priority=4, tags="warning")
-            return context.res.json(
-                {"success": False, "error": f"Error updating device: {str(e)}"}, 500
-            )
-
-        # Update all notifications for this device with new IP and port
-        updated_notifications = 0
-        try:
-            notification_documents = _list_all_documents(
-                databases,
-                database_id=database_id,
-                collection_id="notifications",
-                queries=[Query.equal("device_id", device_id)],
-            )
-
-            for document in notification_documents:
-                _retry_appwrite(
-                    databases.update_document,
-                    database_id=database_id,
-                    collection_id="notifications",
-                    document_id=document["$id"],
-                    data={"ip_address": ip_address, "port": str(port) if port is not None else None},
-                )
-                updated_notifications += 1
-
-        except AppwriteException:
-            pass  # Continue even if notification update fails
-
-        ntfy_alert(
-            f'[device-handler] IP refreshed for "{device_name}" ({device_id}): {old_ip} -> {ip_address}',
-            topic="projectbilal-events",
-            priority=2,
-            tags="arrows_counterclockwise",
-        )
-        return context.res.json(
-            {
-                "success": True,
-                "message": f"IP refreshed for device {device_id}",
-                "ip_changed": True,
-                "old_ip": old_ip,
-                "new_ip": ip_address,
-                "notifications_updated": updated_notifications,
-            }
-        )
-
-    except Exception as e:
-        ntfy_alert(f"[device-handler] refresh_ip failed for {device_id}: {e}", priority=4, tags="warning")
-        return context.res.json(
-            {"success": False, "error": f"Error during IP refresh: {str(e)}"}, 500
-        )
 
 
 def handle_device_disable_with_cleanup(context, databases, database_id, device_id):
