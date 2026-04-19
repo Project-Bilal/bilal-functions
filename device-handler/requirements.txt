@@ -1,1 +1,1 @@
-appwrite>=1.8.0
+appwrite>=1.8.0,<19
