@@ -94,7 +94,7 @@ def main(context):
     try:
         # Query for enabled notifications with timestampUTC equal to current_time
         notifications = _retry_appwrite(
-            databases.list_documents,
+            databases.list_rows,
             database_id="projectbilal",
             collection_id="notifications",
             queries=[
@@ -143,7 +143,7 @@ def main(context):
             for did in unique_device_ids:
                 try:
                     devices = _retry_appwrite(
-                        databases.list_documents,
+                        databases.list_rows,
                         database_id="projectbilal",
                         collection_id="devices",
                         queries=[Query.equal("device_id", did), Query.limit(1)],

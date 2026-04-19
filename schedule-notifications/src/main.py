@@ -62,7 +62,7 @@ def _list_all_documents(databases, database_id, collection_id, queries=None):
         q.append(Query.limit(limit))
         q.append(Query.offset(offset))
         result = _retry_appwrite(
-            databases.list_documents,
+            databases.list_rows,
             database_id=database_id,
             collection_id=collection_id,
             queries=q,
@@ -261,7 +261,7 @@ def delete_existing_notifications(databases, device_ids):
     for device_id in device_ids:
         try:
             _retry_appwrite(
-                databases.delete_documents,
+                databases.delete_rows,
                 database_id="projectbilal",
                 collection_id="notifications",
                 queries=[Query.equal("device_id", device_id)],
@@ -579,7 +579,7 @@ def main(context):
 
             try:
                 _retry_appwrite(
-                    databases.upsert_documents,
+                    databases.upsert_rows,
                     database_id="projectbilal",
                     collection_id="notifications",
                     documents=all_notifications,
