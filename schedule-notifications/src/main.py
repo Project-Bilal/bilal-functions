@@ -1,5 +1,5 @@
 from appwrite.client import Client
-from appwrite.services.databases import Databases
+from appwrite.services.tables_db import TablesDB
 from appwrite.query import Query
 from datetime import datetime, timezone, timedelta
 import os
@@ -29,8 +29,8 @@ def ntfy_alert(message: str, topic: str = "projectbilal-errors", title: str = "P
         pass  # Never break main flow
 
 
-def _document_to_plain_dict(doc):
-    """Normalize Appwrite Document models (Pydantic) or dicts to a flat dict."""
+def _row_to_plain_dict(doc):
+    """Normalize Appwrite Row models (Pydantic) or dicts to a flat dict."""
     if isinstance(doc, dict):
         return doc
     to_dict = getattr(doc, "to_dict", None)
@@ -43,17 +43,17 @@ def _document_to_plain_dict(doc):
     return doc
 
 
-def _doclist_documents(doclist):
-    if hasattr(doclist, "documents"):
-        raw = doclist.documents
+def _doclist_rows(doclist):
+    if hasattr(doclist, "rows"):
+        raw = doclist.rows
     elif isinstance(doclist, dict):
-        raw = doclist.get("documents", [])
+        raw = doclist.get("rows", [])
     else:
         raw = []
-    return [_document_to_plain_dict(d) for d in raw]
+    return [_row_to_plain_dict(d) for d in raw]
 
-def _list_all_documents(databases, database_id, collection_id, queries=None):
-    """Fetch all documents, paginating through Appwrite's 25-doc default limit."""
+def _list_all_rows(tables_db, database_id, table_id, queries=None):
+    """Fetch all rows, paginating through Appwrite's 25-row default limit."""
     all_docs = []
     limit = 100
     offset = 0
@@ -62,12 +62,12 @@ def _list_all_documents(databases, database_id, collection_id, queries=None):
         q.append(Query.limit(limit))
         q.append(Query.offset(offset))
         result = _retry_appwrite(
-            databases.list_documents,
+            tables_db.list_rows,
             database_id=database_id,
-            collection_id=collection_id,
+            table_id=table_id,
             queries=q,
         )
-        docs = _doclist_documents(result)
+        docs = _doclist_rows(result)
         all_docs.extend(docs)
         if len(docs) < limit:
             break
@@ -203,12 +203,12 @@ def init_appwrite_client(context):
     )
 
 
-def fetch_enabled_devices(databases):
+def fetch_enabled_devices(tables_db):
     """Fetch all enabled devices."""
-    return _list_all_documents(
-        databases,
+    return _list_all_rows(
+        tables_db,
         database_id="projectbilal",
-        collection_id="devices",
+        table_id="devices",
         queries=[Query.equal("enabled", True)],
     )
 
@@ -254,16 +254,16 @@ def build_device_object(device, timings):
     }
 
 
-def delete_existing_notifications(databases, device_ids):
+def delete_existing_notifications(tables_db, device_ids):
     """Delete all existing notifications for the given device IDs.
     Returns list of device_ids that failed deletion (should be excluded from upsert)."""
     failed_ids = []
     for device_id in device_ids:
         try:
             _retry_appwrite(
-                databases.delete_documents,
+                tables_db.delete_rows,
                 database_id="projectbilal",
-                collection_id="notifications",
+                table_id="notifications",
                 queries=[Query.equal("device_id", device_id)],
             )
         except Exception as e:
@@ -493,7 +493,7 @@ def build_notifications_for_device(device, target_date, context):
 
 def main(context):
     client = init_appwrite_client(context)
-    databases = Databases(client)
+    tables_db = TablesDB(client)
 
     try:
         # Check if specific device_id is provided
@@ -502,10 +502,10 @@ def main(context):
 
         if target_device_id:
             # Process only the specified device
-            devices = _list_all_documents(
-                databases,
+            devices = _list_all_rows(
+                tables_db,
                 database_id="projectbilal",
-                collection_id="devices",
+                table_id="devices",
                 queries=[
                     Query.equal("enabled", True),
                     Query.equal("device_id", target_device_id),
@@ -513,22 +513,22 @@ def main(context):
             )
 
             # Fetch all timings for this specific device (enabled and disabled)
-            timings = _list_all_documents(
-                databases,
+            timings = _list_all_rows(
+                tables_db,
                 database_id="projectbilal",
-                collection_id="timings",
+                table_id="timings",
                 queries=[
                     Query.equal("device_id", target_device_id),
                 ],
             )
         else:
             # Process all devices (current behavior)
-            devices = fetch_enabled_devices(databases)
+            devices = fetch_enabled_devices(tables_db)
             # Fetch all timings (enabled and disabled)
-            timings = _list_all_documents(
-                databases,
+            timings = _list_all_rows(
+                tables_db,
                 database_id="projectbilal",
-                collection_id="timings",
+                table_id="timings",
             )
 
         # Group timings by device_id
@@ -569,7 +569,7 @@ def main(context):
             )
 
             # Delete existing notifications for these devices
-            failed_ids = delete_existing_notifications(databases, device_ids)
+            failed_ids = delete_existing_notifications(tables_db, device_ids)
 
             # Exclude devices whose old notifications couldn't be deleted (prevent duplicates)
             if failed_ids:
@@ -579,10 +579,10 @@ def main(context):
 
             try:
                 _retry_appwrite(
-                    databases.upsert_documents,
+                    tables_db.upsert_rows,
                     database_id="projectbilal",
-                    collection_id="notifications",
-                    documents=all_notifications,
+                    table_id="notifications",
+                    rows=all_notifications,
                 )
                 ntfy_alert(
                     f"[schedule-notifications] Scheduled {len(all_notifications)} notifications for {len(device_ids) - len(failed_ids)} devices",

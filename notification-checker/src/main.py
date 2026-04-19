@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from appwrite.client import Client
-from appwrite.services.databases import Databases
+from appwrite.services.tables_db import TablesDB
 from appwrite.query import Query
 import os
 import json
@@ -34,8 +34,8 @@ def _doclist_total(doclist):
     return 0
 
 
-def _document_to_plain_dict(doc):
-    """Normalize Appwrite Document models (Pydantic) or dicts to a flat dict."""
+def _row_to_plain_dict(doc):
+    """Normalize Appwrite Row models (Pydantic) or dicts to a flat dict."""
     if isinstance(doc, dict):
         return doc
     to_dict = getattr(doc, "to_dict", None)
@@ -48,14 +48,14 @@ def _document_to_plain_dict(doc):
     return doc
 
 
-def _doclist_documents(doclist):
-    if hasattr(doclist, "documents"):
-        raw = doclist.documents
+def _doclist_rows(doclist):
+    if hasattr(doclist, "rows"):
+        raw = doclist.rows
     elif isinstance(doclist, dict):
-        raw = doclist.get("documents", [])
+        raw = doclist.get("rows", [])
     else:
         raw = []
-    return [_document_to_plain_dict(d) for d in raw]
+    return [_row_to_plain_dict(d) for d in raw]
 
 
 def _retry_appwrite(fn, *args, max_attempts=3, **kwargs):
@@ -89,14 +89,14 @@ def main(context):
         .set_endpoint("https://fra.cloud.appwrite.io/v1")
     )
 
-    databases = Databases(client)
+    tables_db = TablesDB(client)
 
     try:
         # Query for enabled notifications with timestampUTC equal to current_time
         notifications = _retry_appwrite(
-            databases.list_documents,
+            tables_db.list_rows,
             database_id="projectbilal",
-            collection_id="notifications",
+            table_id="notifications",
             queries=[
                 Query.equal("timestampUTC", current_time),
                 Query.equal("enabled", True),
@@ -104,14 +104,14 @@ def main(context):
             ],
         )
         notifications_total = _doclist_total(notifications)
-        notification_documents = _doclist_documents(notifications)
+        notification_rows = _doclist_rows(notifications)
 
         if notifications_total > 0:
             processed_count = 0
 
             # Prepare all valid notifications first
             valid_notifications = []
-            for notification in notification_documents:
+            for notification in notification_rows:
                 # Skip disabled notifications (safety check)
                 if not notification.get("enabled", True):
                     continue
@@ -143,12 +143,12 @@ def main(context):
             for did in unique_device_ids:
                 try:
                     devices = _retry_appwrite(
-                        databases.list_documents,
+                        tables_db.list_rows,
                         database_id="projectbilal",
-                        collection_id="devices",
+                        table_id="devices",
                         queries=[Query.equal("device_id", did), Query.limit(1)],
                     )
-                    docs = _doclist_documents(devices)
+                    docs = _doclist_rows(devices)
                     if docs and docs[0].get("name"):
                         device_names[did] = docs[0]["name"]
                 except Exception:
