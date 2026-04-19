@@ -77,7 +77,7 @@ def _list_all_documents(databases, database_id, collection_id, queries=None):
         q.append(Query.limit(limit))
         q.append(Query.offset(offset))
         result = _retry_appwrite(
-            databases.list_rows,
+            databases.list_documents,
             database_id=database_id,
             collection_id=collection_id,
             queries=q,
@@ -174,7 +174,7 @@ def handle_device_deletion(context, databases, database_id, device_id):
         # Batch delete timings for this device
         try:
             _retry_appwrite(
-                databases.delete_rows,
+                databases.delete_documents,
                 database_id=database_id,
                 collection_id="timings",
                 queries=[Query.equal("device_id", device_id)],
@@ -185,7 +185,7 @@ def handle_device_deletion(context, databases, database_id, device_id):
         # Batch delete notifications for this device
         try:
             _retry_appwrite(
-                databases.delete_rows,
+                databases.delete_documents,
                 database_id=database_id,
                 collection_id="notifications",
                 queries=[Query.equal("device_id", device_id)],
@@ -207,7 +207,7 @@ def handle_device_deletion(context, databases, database_id, device_id):
 
                 # Update the device document with the specified values
                 _retry_appwrite(
-                    databases.update_row,
+                    databases.update_document,
                     database_id=database_id,
                     collection_id="devices",
                     document_id=device_doc["$id"],
@@ -318,7 +318,7 @@ def handle_device_onboarding(
                 context.log(f"Status transition: {current_status} -> {new_status}")
 
                 _retry_appwrite(
-                    databases.update_row,
+                    databases.update_document,
                     database_id=database_id,
                     collection_id="devices",
                     document_id=device_doc["$id"],
@@ -342,7 +342,7 @@ def handle_device_onboarding(
                 context.log(f"Device doesn't exist - creating new device document")
                 # New devices start as "pending" since they haven't connected yet
                 _retry_appwrite(
-                    databases.create_row,
+                    databases.create_document,
                     database_id=database_id,
                     collection_id="devices",
                     document_id=device_id,
@@ -383,7 +383,7 @@ def handle_device_onboarding(
             try:
                 timing_doc_id = f"{device_id}_{prayer_name.lower()}"
                 _retry_appwrite(
-                    databases.delete_row,
+                    databases.delete_document,
                     database_id=database_id,
                     collection_id="timings",
                     document_id=timing_doc_id,
@@ -406,7 +406,7 @@ def handle_device_onboarding(
                 for prayer_name in prayer_names:
                     timing_doc_id = f"{device_id}_{prayer_name.lower()}"
                     _retry_appwrite(
-                        databases.create_row,
+                        databases.create_document,
                         database_id=database_id,
                         collection_id="timings",
                         document_id=timing_doc_id,
@@ -506,7 +506,7 @@ def handle_device_status_update(
             if device_documents:
                 device_doc = device_documents[0]
                 _retry_appwrite(
-                    databases.update_row,
+                    databases.update_document,
                     database_id=database_id,
                     collection_id="devices",
                     document_id=device_doc["$id"],
@@ -553,7 +553,7 @@ def handle_device_disable_with_cleanup(context, databases, database_id, device_i
         # Batch delete notifications for this device
         try:
             _retry_appwrite(
-                databases.delete_rows,
+                databases.delete_documents,
                 database_id=database_id,
                 collection_id="notifications",
                 queries=[Query.equal("device_id", device_id)],
@@ -572,7 +572,7 @@ def handle_device_disable_with_cleanup(context, databases, database_id, device_i
             if device_documents:
                 device_doc = device_documents[0]
                 _retry_appwrite(
-                    databases.update_row,
+                    databases.update_document,
                     database_id=database_id,
                     collection_id="devices",
                     document_id=device_doc["$id"],
